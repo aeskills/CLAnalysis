@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Log Analysis - CSV Processor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <!-- Custom SVG representing data flow -->
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                </div>
+                <h1>Content Log Analysis</h1>
+                <span>CSV Processor</span>
+            </div>
+            <div>
+                <!-- Clean status info or settings button -->
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Left Sidebar: Configuration & Uploads -->
+        <section class="sidebar">
+            <div class="glass-card">
+                <h2 class="card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    Upload CSV Files
+                </h2>
+                
+                <div class="upload-zone" id="uploadZone">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="12" y1="8" x2="12" y2="16"></line>
+                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                    </svg>
+                    <h3>Drag & Drop CSVs here</h3>
+                    <p>or click to browse local files</p>
+                    <input type="file" id="fileInput" class="file-input" multiple accept=".csv">
+                </div>
+
+                <div class="file-list" id="fileList">
+                    <!-- Dynamically populated files -->
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h2 class="card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    Column Mapping
+                </h2>
+
+                <div class="config-group">
+                    <label for="emailColumn">Email Column <span>(User Email)</span></label>
+                    <select id="emailColumn" class="config-select">
+                        <option value="auto">Auto-detect (Look for Column D / Email)</option>
+                    </select>
+                </div>
+
+                <div class="config-group">
+                    <label for="actionColumn">Filter Column <span>(Actions)</span></label>
+                    <select id="actionColumn" class="config-select">
+                        <option value="auto">Auto-detect (Look for Read/Create/Link)</option>
+                    </select>
+                </div>
+
+                <div class="config-group">
+                    <label for="actionValues">Action Filter Values</label>
+                    <input type="text" id="actionValues" class="config-input" value="Read, Create, Create with public Link">
+                </div>
+
+                <button class="action-btn" id="processBtn" disabled>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Process Files
+                </button>
+            </div>
+        </section>
+
+        <!-- Right: Dashboard & Processing Panel -->
+        <section class="dashboard">
+            <!-- Stats Board -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Files</div>
+                    <div class="stat-val" id="statFiles">0</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-label">Records Read</div>
+                    <div class="stat-val" id="statProcessed">0</div>
+                </div>
+                <div class="stat-card danger">
+                    <div class="stat-label">Filtered Emails</div>
+                    <div class="stat-val" id="statFiltered">0</div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-label">Final Clean Emails</div>
+                    <div class="stat-val" id="statClean">0</div>
+                </div>
+            </div>
+
+            <!-- Progress Bar (Hidden by default or empty width) -->
+            <div class="processing-banner" id="progressBanner" style="display: none;">
+                <div class="progress-header">
+                    <div class="progress-title">
+                        <div class="spinner"></div>
+                        <span id="progressStatusText">Analyzing data streams...</span>
+                    </div>
+                    <div class="progress-percent" id="progressPercentText">0%</div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+            </div>
+
+            <!-- Console Log Panel -->
+            <div class="glass-card">
+                <h2 class="card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="4 17 10 11 4 5"></polyline>
+                        <line x1="12" y1="19" x2="20" y2="19"></line>
+                    </svg>
+                    Processing Event Console
+                </h2>
+                <div class="console-panel" id="consolePanel">
+                    <div class="console-log info">
+                        <span class="timestamp">[14:48:00]</span>System ready. Upload multiple CSV logs to start processing.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Preview -->
+            <div class="glass-card">
+                <h2 class="card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    Clean Email Data Preview (First 100 rows)
+                </h2>
+                
+                <div class="table-container">
+                    <table class="preview-table" id="previewTable" style="display: none;">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Index</th>
+                                <th>User Email</th>
+                            </tr>
+                        </thead>
+                        <tbody id="previewTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                    
+                    <div class="preview-placeholder" id="previewPlaceholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                        </svg>
+                        <p>No preview available. Process files to view filtered results.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download Button -->
+            <div class="download-section">
+                <button class="btn-secondary" id="resetBtn">Reset</button>
+                <button class="btn-secondary btn-success" id="downloadBtn" disabled>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download Filtered CSV
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-container">
+            <p>Content Log Analysis Utility &copy; 2026. Built with HTML5 Web Workers for local, secure processing.</p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
