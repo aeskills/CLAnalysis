@@ -78,8 +78,37 @@
                 </div>
 
                 <div class="config-group">
-                    <label for="actionValues">Action Filter Values</label>
-                    <input type="text" id="actionValues" class="config-input" value="Read, Create, Create with public Link">
+                    <label>Action Filter Values</label>
+                    <div class="multiselect-dropdown" id="actionValuesDropdown">
+                        <div class="dropdown-trigger" id="dropdownTrigger">
+                            <span id="selectedActionsText">Read, Created, Created public link</span>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                        <div class="dropdown-menu" id="dropdownMenu" style="display: none;">
+                            <label class="dropdown-item">
+                                <input type="checkbox" value="Read" checked>
+                                <span>Read</span>
+                            </label>
+                            <label class="dropdown-item">
+                                <input type="checkbox" value="Created" checked>
+                                <span>Created</span>
+                            </label>
+                            <label class="dropdown-item">
+                                <input type="checkbox" value="Created public link" checked>
+                                <span>Created public link</span>
+                            </label>
+                            <label class="dropdown-item">
+                                <input type="checkbox" value="Copied">
+                                <span>Copied</span>
+                            </label>
+                            <label class="dropdown-item">
+                                <input type="checkbox" value="Updated">
+                                <span>Updated</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
 
                 <button class="action-btn" id="processBtn" disabled>

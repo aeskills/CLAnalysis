@@ -11,7 +11,10 @@ const fileInput = document.getElementById('fileInput');
 const fileList = document.getElementById('fileList');
 const emailColumnSelect = document.getElementById('emailColumn');
 const actionColumnSelect = document.getElementById('actionColumn');
-const actionValuesInput = document.getElementById('actionValues');
+const dropdownTrigger = document.getElementById('dropdownTrigger');
+const dropdownMenu = document.getElementById('dropdownMenu');
+const selectedActionsText = document.getElementById('selectedActionsText');
+const checkboxes = document.querySelectorAll('#dropdownMenu input[type="checkbox"]');
 const processBtn = document.getElementById('processBtn');
 const resetBtn = document.getElementById('resetBtn');
 const downloadBtn = document.getElementById('downloadBtn');
@@ -237,7 +240,10 @@ processBtn.addEventListener('click', () => {
     // UI Configuration state
     const emailConfig = emailColumnSelect.value;
     const actionConfig = actionColumnSelect.value;
-    const actionValues = actionValuesInput.value;
+    const actionValues = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.value)
+        .join(', ');
 
     // Toggle interactive states
     toggleInputs(true);
@@ -311,7 +317,14 @@ function toggleInputs(disabled) {
     fileInput.disabled = disabled;
     emailColumnSelect.disabled = disabled;
     actionColumnSelect.disabled = disabled;
-    actionValuesInput.disabled = disabled;
+    checkboxes.forEach(cb => cb.disabled = disabled);
+    if (disabled) {
+        dropdownTrigger.classList.add('disabled');
+        dropdownMenu.style.display = 'none';
+        dropdownTrigger.classList.remove('active');
+    } else {
+        dropdownTrigger.classList.remove('disabled');
+    }
     processBtn.disabled = disabled;
     
     // Disable file removal buttons
@@ -432,8 +445,55 @@ resetBtn.addEventListener('click', () => {
     
     downloadBtn.disabled = true;
     toggleInputs(false);
+    
+    // Reset checkboxes to default values
+    checkboxes.forEach(cb => {
+        if (cb.value === "Read" || cb.value === "Created" || cb.value === "Created public link") {
+            cb.checked = true;
+        } else {
+            cb.checked = false;
+        }
+    });
+    updateSelectedActionsText();
 
     // Log reset
     consolePanel.innerHTML = '';
     addConsoleLog('System state reset. Upload multiple CSV logs to start processing.', 'info');
+});
+
+// --- Custom Multiselect Event Listeners ---
+function updateSelectedActionsText() {
+    const selected = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+    
+    if (selected.length === 0) {
+        selectedActionsText.textContent = "Select actions...";
+    } else {
+        selectedActionsText.textContent = selected.join(', ');
+    }
+}
+
+// Toggle dropdown visibility
+dropdownTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (dropdownTrigger.classList.contains('disabled')) return;
+    const isVisible = dropdownMenu.style.display === 'flex';
+    dropdownMenu.style.display = isVisible ? 'none' : 'flex';
+    dropdownTrigger.classList.toggle('active', !isVisible);
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (!dropdownTrigger.contains(e.target) && !dropdownMenu.contains(e.target)) {
+        dropdownMenu.style.display = 'none';
+        dropdownTrigger.classList.remove('active');
+    }
+});
+
+// Listen to checkbox changes
+checkboxes.forEach(cb => {
+    cb.addEventListener('change', () => {
+        updateSelectedActionsText();
+    });
 });
