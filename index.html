@@ -64,20 +64,6 @@
                 </h2>
 
                 <div class="config-group">
-                    <label for="emailColumn">Email Column <span>(User Email)</span></label>
-                    <select id="emailColumn" class="config-select">
-                        <option value="auto">Auto-detect (Look for Column D / Email)</option>
-                    </select>
-                </div>
-
-                <div class="config-group">
-                    <label for="actionColumn">Filter Column <span>(Actions)</span></label>
-                    <select id="actionColumn" class="config-select">
-                        <option value="auto">Auto-detect (Look for Read/Create/Link)</option>
-                    </select>
-                </div>
-
-                <div class="config-group">
                     <label>Action Filter Values</label>
                     <div class="multiselect-dropdown" id="actionValuesDropdown">
                         <div class="dropdown-trigger" id="dropdownTrigger">
@@ -88,8 +74,13 @@
                         </div>
                         <div class="dropdown-menu" id="dropdownMenu" style="display: none;">
                             <label class="dropdown-item">
-                                <input type="checkbox" value="Read" checked>
-                                <span>Read</span>
+                                <input type="checkbox" id="selectAllCheckbox">
+                                <span style="font-weight: 600;">Select All</span>
+                            </label>
+                            <div class="dropdown-divider"></div>
+                            <label class="dropdown-item">
+                                <input type="checkbox" value="Copied">
+                                <span>Copied</span>
                             </label>
                             <label class="dropdown-item">
                                 <input type="checkbox" value="Created" checked>
@@ -100,8 +91,8 @@
                                 <span>Created public link</span>
                             </label>
                             <label class="dropdown-item">
-                                <input type="checkbox" value="Copied">
-                                <span>Copied</span>
+                                <input type="checkbox" value="Read" checked>
+                                <span>Read</span>
                             </label>
                             <label class="dropdown-item">
                                 <input type="checkbox" value="Updated">
@@ -230,6 +221,6 @@
         </div>
     </footer>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=1.0.1"></script>
 </body>
 </html>

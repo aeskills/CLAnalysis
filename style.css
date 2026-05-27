@@ -798,6 +798,12 @@ footer {
     flex-grow: 1;
 }
 
+.dropdown-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 0.25rem 0;
+}
+
 .dropdown-trigger.disabled {
     opacity: 0.5;
     cursor: not-allowed;

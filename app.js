@@ -9,12 +9,11 @@ let processedBlobUrl = null;
 const uploadZone = document.getElementById('uploadZone');
 const fileInput = document.getElementById('fileInput');
 const fileList = document.getElementById('fileList');
-const emailColumnSelect = document.getElementById('emailColumn');
-const actionColumnSelect = document.getElementById('actionColumn');
 const dropdownTrigger = document.getElementById('dropdownTrigger');
 const dropdownMenu = document.getElementById('dropdownMenu');
 const selectedActionsText = document.getElementById('selectedActionsText');
-const checkboxes = document.querySelectorAll('#dropdownMenu input[type="checkbox"]');
+const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+const checkboxes = document.querySelectorAll('#dropdownMenu input[type="checkbox"]:not(#selectAllCheckbox)');
 const processBtn = document.getElementById('processBtn');
 const resetBtn = document.getElementById('resetBtn');
 const downloadBtn = document.getElementById('downloadBtn');
@@ -118,16 +117,6 @@ async function handleFileSelection(fileListObj) {
     // Update UI lists and controls
     renderFileList();
     updateStatsBoard();
-
-    // Scan headers of the first file to populate mapping options
-    if (uploadedFiles.length > 0) {
-        try {
-            const headers = await readCSVHeaders(uploadedFiles[0]);
-            populateColumnSelectors(headers);
-        } catch (err) {
-            addConsoleLog(`Failed to parse CSV headers for mapping: ${err.message}`, 'warning');
-        }
-    }
 }
 
 // Render files inside the uploaded files list card
@@ -166,58 +155,6 @@ function removeFile(index) {
     uploadedFiles.splice(index, 1);
     renderFileList();
     updateStatsBoard();
-    
-    if (uploadedFiles.length === 0) {
-        resetColumnSelectors();
-    }
-}
-
-// Retrieve headers from the first chunk of a file
-function readCSVHeaders(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        // Read first 15KB of file to ensure we get the full header line
-        const slice = file.slice(0, 15360);
-        reader.onload = () => {
-            const text = reader.result;
-            const lines = text.split(/\r?\n/);
-            if (lines.length > 0 && lines[0].trim()) {
-                const headers = parseCSVLine(lines[0]);
-                resolve(headers.map(h => h.trim()));
-            } else {
-                reject(new Error('File appears to be empty or missing headers.'));
-            }
-        };
-        reader.onerror = () => reject(reader.error);
-        reader.readAsText(slice);
-    });
-}
-
-function populateColumnSelectors(headers) {
-    // Preserve auto detect options
-    emailColumnSelect.innerHTML = '<option value="auto">Auto-detect (Column D / "User Email")</option>';
-    actionColumnSelect.innerHTML = '<option value="auto">Auto-detect (Look for "Action" / "Event")</option>';
-
-    headers.forEach((header, index) => {
-        if (!header) return;
-        
-        const optionEmail = document.createElement('option');
-        optionEmail.value = header;
-        optionEmail.textContent = `${header} (Col ${index + 1})`;
-        emailColumnSelect.appendChild(optionEmail);
-
-        const optionAction = document.createElement('option');
-        optionAction.value = header;
-        optionAction.textContent = `${header} (Col ${index + 1})`;
-        actionColumnSelect.appendChild(optionAction);
-    });
-    
-    addConsoleLog(`Loaded column dropdown configuration with ${headers.length} detected headers.`, 'info');
-}
-
-function resetColumnSelectors() {
-    emailColumnSelect.innerHTML = '<option value="auto">Auto-detect (Column D / "User Email")</option>';
-    actionColumnSelect.innerHTML = '<option value="auto">Auto-detect (Look for "Action" / "Event")</option>';
 }
 
 function updateStatsBoard(stats = null) {
@@ -238,8 +175,8 @@ processBtn.addEventListener('click', () => {
     if (uploadedFiles.length === 0) return;
 
     // UI Configuration state
-    const emailConfig = emailColumnSelect.value;
-    const actionConfig = actionColumnSelect.value;
+    const emailConfig = 'auto';
+    const actionConfig = 'auto';
     const actionValues = Array.from(checkboxes)
         .filter(cb => cb.checked)
         .map(cb => cb.value)
@@ -252,7 +189,7 @@ processBtn.addEventListener('click', () => {
     progressBanner.style.display = 'block';
     progressStatusText.textContent = `Starting pipeline processing...`;
     progressPercentText.textContent = '0%';
-    progressBarFill.style.style = '0%';
+    progressBarFill.style.width = '0%';
     
     // Clear preview table and download blob
     previewTable.style.display = 'none';
@@ -266,7 +203,7 @@ processBtn.addEventListener('click', () => {
     addConsoleLog('Initializing background worker thread...', 'info');
 
     // Create web worker
-    worker = new Worker('parser-worker.js');
+    worker = new Worker('parser-worker.js?v=1.0.1');
 
     // Send processing data
     worker.postMessage({
@@ -315,8 +252,7 @@ processBtn.addEventListener('click', () => {
 
 function toggleInputs(disabled) {
     fileInput.disabled = disabled;
-    emailColumnSelect.disabled = disabled;
-    actionColumnSelect.disabled = disabled;
+    selectAllCheckbox.disabled = disabled;
     checkboxes.forEach(cb => cb.disabled = disabled);
     if (disabled) {
         dropdownTrigger.classList.add('disabled');
@@ -418,7 +354,6 @@ downloadBtn.addEventListener('click', () => {
 resetBtn.addEventListener('click', () => {
     uploadedFiles = [];
     renderFileList();
-    resetColumnSelectors();
     updateStatsBoard();
 
     // Terminate worker if working
@@ -447,6 +382,7 @@ resetBtn.addEventListener('click', () => {
     toggleInputs(false);
     
     // Reset checkboxes to default values
+    selectAllCheckbox.checked = false;
     checkboxes.forEach(cb => {
         if (cb.value === "Read" || cb.value === "Created" || cb.value === "Created public link") {
             cb.checked = true;
@@ -491,9 +427,20 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Listen to Select All checkbox change
+selectAllCheckbox.addEventListener('change', () => {
+    const isChecked = selectAllCheckbox.checked;
+    checkboxes.forEach(cb => {
+        cb.checked = isChecked;
+    });
+    updateSelectedActionsText();
+});
+
 // Listen to checkbox changes
 checkboxes.forEach(cb => {
     cb.addEventListener('change', () => {
+        const allChecked = Array.from(checkboxes).every(c => c.checked);
+        selectAllCheckbox.checked = allChecked;
         updateSelectedActionsText();
     });
 });
