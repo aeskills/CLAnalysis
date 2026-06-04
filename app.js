@@ -1,9 +1,11 @@
 // Application Coordinator for CSV Dataflow Admin Console Processor
+// v2.0.0 - Dynamic action detection from uploaded CSV data
 
 // State
 let uploadedFiles = [];
 let worker = null;
 let processedBlobUrl = null;
+let detectedActions = []; // Dynamically detected action values from CSV
 
 // UI Elements
 const uploadZone = document.getElementById('uploadZone');
@@ -13,7 +15,7 @@ const dropdownTrigger = document.getElementById('dropdownTrigger');
 const dropdownMenu = document.getElementById('dropdownMenu');
 const selectedActionsText = document.getElementById('selectedActionsText');
 const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-const checkboxes = document.querySelectorAll('#dropdownMenu input[type="checkbox"]:not(#selectAllCheckbox)');
+const actionItemsContainer = document.getElementById('actionItemsContainer');
 const processBtn = document.getElementById('processBtn');
 const resetBtn = document.getElementById('resetBtn');
 const downloadBtn = document.getElementById('downloadBtn');
@@ -78,6 +80,139 @@ function addConsoleLog(message, type = 'info', timestamp = null) {
     consolePanel.scrollTop = consolePanel.scrollHeight;
 }
 
+// ==========================================
+// Dynamic Action Detection from CSV Files
+// ==========================================
+
+// Detect the action column index from headers
+function detectActionColumnIndex(headers) {
+    const keywords = ['action', 'event', 'activity', 'operation', 'type', 'permission'];
+    for (const kw of keywords) {
+        for (let i = 0; i < headers.length; i++) {
+            const header = headers[i].toLowerCase().trim();
+            if (header === kw || header.includes(kw)) {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+
+// Scan uploaded files to find unique action values
+async function scanForActionValues(files) {
+    const actionSet = new Set();
+    
+    for (const file of files) {
+        // Read a sample from each file (first 2MB is plenty to detect all action types)
+        const sampleSize = Math.min(file.size, 2 * 1024 * 1024);
+        const slice = file.slice(0, sampleSize);
+        const text = await readBlobAsText(slice);
+        
+        const lines = text.split(/\r?\n/);
+        if (lines.length < 2) continue;
+        
+        // Parse header
+        const headers = parseCSVLine(lines[0]);
+        const actionColIdx = detectActionColumnIndex(headers);
+        
+        if (actionColIdx === -1) {
+            addConsoleLog(`Could not detect action column in "${file.name}". Headers: ${headers.join(', ')}`, 'error');
+            continue;
+        }
+        
+        // Scan data rows for unique action values
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            const fields = parseCSVLine(line);
+            if (fields[actionColIdx]) {
+                const actionVal = fields[actionColIdx].trim();
+                if (actionVal && actionVal.length > 0) {
+                    actionSet.add(actionVal);
+                }
+            }
+        }
+    }
+    
+    return Array.from(actionSet).sort();
+}
+
+function readBlobAsText(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsText(blob);
+    });
+}
+
+// Build the dropdown checkboxes dynamically from detected action values
+function populateActionDropdown(actions, selectAll = true) {
+    actionItemsContainer.innerHTML = '';
+    detectedActions = actions;
+    
+    actions.forEach(action => {
+        const label = document.createElement('label');
+        label.className = 'dropdown-item';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = action;
+        checkbox.checked = selectAll; // Select all by default on first detection
+        
+        const span = document.createElement('span');
+        span.textContent = action;
+        
+        label.appendChild(checkbox);
+        label.appendChild(span);
+        actionItemsContainer.appendChild(label);
+        
+        // Attach change listener
+        checkbox.addEventListener('change', () => {
+            const allCheckboxes = getActionCheckboxes();
+            const allChecked = allCheckboxes.every(c => c.checked);
+            selectAllCheckbox.checked = allChecked;
+            updateSelectedActionsText();
+            
+            // Enable process button if we have files and at least one checkbox is selected
+            const hasChecked = allCheckboxes.some(cb => cb.checked);
+            processBtn.disabled = !hasChecked || uploadedFiles.length === 0;
+        });
+    });
+    
+    // Update select all state
+    selectAllCheckbox.checked = selectAll;
+    updateSelectedActionsText();
+}
+
+// Get all dynamically created action checkboxes
+function getActionCheckboxes() {
+    return Array.from(actionItemsContainer.querySelectorAll('input[type="checkbox"]'));
+}
+
+// Update the selected actions text display
+function updateSelectedActionsText() {
+    const checkboxes = getActionCheckboxes();
+    const selected = checkboxes
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+    
+    if (checkboxes.length === 0) {
+        selectedActionsText.textContent = "Upload CSV files to detect actions...";
+    } else if (selected.length === 0) {
+        selectedActionsText.textContent = "Select actions...";
+    } else if (selected.length === checkboxes.length) {
+        selectedActionsText.textContent = `All actions selected (${selected.length})`;
+    } else {
+        selectedActionsText.textContent = selected.join(', ');
+    }
+}
+
+// ==========================================
+// File Upload & Handling
+// ==========================================
+
 // Drag & drop handlers
 uploadZone.addEventListener('dragover', (e) => {
     e.preventDefault();
@@ -117,6 +252,22 @@ async function handleFileSelection(fileListObj) {
     // Update UI lists and controls
     renderFileList();
     updateStatsBoard();
+    
+    // Scan all uploaded files for action values and populate dropdown
+    addConsoleLog('Scanning CSV files to detect action filter values...', 'info');
+    try {
+        const actions = await scanForActionValues(uploadedFiles);
+        if (actions.length > 0) {
+            populateActionDropdown(actions, true);
+            addConsoleLog(`Detected ${actions.length} unique action types: ${actions.join(', ')}`, 'success');
+            processBtn.disabled = false;
+        } else {
+            addConsoleLog('No action values detected in CSV files. Check column headers.', 'error');
+            processBtn.disabled = true;
+        }
+    } catch (err) {
+        addConsoleLog(`Error scanning CSV files: ${err.message}`, 'error');
+    }
 }
 
 // Render files inside the uploaded files list card
@@ -155,6 +306,15 @@ function removeFile(index) {
     uploadedFiles.splice(index, 1);
     renderFileList();
     updateStatsBoard();
+    
+    if (uploadedFiles.length === 0) {
+        // Clear the action dropdown if no files remain
+        actionItemsContainer.innerHTML = '';
+        detectedActions = [];
+        selectAllCheckbox.checked = false;
+        updateSelectedActionsText();
+        processBtn.disabled = true;
+    }
 }
 
 function updateStatsBoard(stats = null) {
@@ -170,17 +330,28 @@ function updateStatsBoard(stats = null) {
     }
 }
 
-// Process Action trigger
+// ==========================================
+// Process Action
+// ==========================================
+
 processBtn.addEventListener('click', () => {
     if (uploadedFiles.length === 0) return;
+
+    // Get selected action values from dynamic checkboxes
+    const actionCheckboxes = getActionCheckboxes();
+    const actionValues = actionCheckboxes
+        .filter(cb => cb.checked)
+        .map(cb => cb.value)
+        .join(', ');
+
+    if (!actionValues) {
+        addConsoleLog('No action filters selected. Please select at least one.', 'error');
+        return;
+    }
 
     // UI Configuration state
     const emailConfig = 'auto';
     const actionConfig = 'auto';
-    const actionValues = Array.from(checkboxes)
-        .filter(cb => cb.checked)
-        .map(cb => cb.value)
-        .join(', ');
 
     // Toggle interactive states
     toggleInputs(true);
@@ -201,9 +372,10 @@ processBtn.addEventListener('click', () => {
     }
 
     addConsoleLog('Initializing background worker thread...', 'info');
+    addConsoleLog(`Active filters: ${actionValues}`, 'info');
 
     // Create web worker
-    worker = new Worker('parser-worker.js?v=1.0.1');
+    worker = new Worker('parser-worker.js?v=2.0.0');
 
     // Send processing data
     worker.postMessage({
@@ -214,7 +386,7 @@ processBtn.addEventListener('click', () => {
     });
 
     worker.onmessage = function(e) {
-        const { type, percent, fileName, rawRecords, matchingActions, adobeExcluded, cleanEmails, timestamp, message, logType, data } = e.data;
+        const { type, percent, fileName, rawRecords, matchingActions, adobeExcluded, cleanEmails, timestamp, message, logLevel, data } = e.data;
 
         switch (type) {
             case 'PROGRESS':
@@ -229,7 +401,7 @@ processBtn.addEventListener('click', () => {
                 break;
 
             case 'LOG':
-                addConsoleLog(e.data.message, e.data.type, e.data.timestamp);
+                addConsoleLog(e.data.message, e.data.logLevel, e.data.timestamp);
                 break;
 
             case 'COMPLETE':
@@ -253,7 +425,8 @@ processBtn.addEventListener('click', () => {
 function toggleInputs(disabled) {
     fileInput.disabled = disabled;
     selectAllCheckbox.disabled = disabled;
-    checkboxes.forEach(cb => cb.disabled = disabled);
+    const actionCheckboxes = getActionCheckboxes();
+    actionCheckboxes.forEach(cb => cb.disabled = disabled);
     if (disabled) {
         dropdownTrigger.classList.add('disabled');
         dropdownMenu.style.display = 'none';
@@ -306,7 +479,10 @@ function finishProcessing(result) {
 
     // Reset controls state
     toggleInputs(false);
-    processBtn.disabled = true; // Block until files or configs change
+    
+    // Keep process button enabled so user can re-process with different filters
+    const hasChecked = getActionCheckboxes().some(cb => cb.checked);
+    processBtn.disabled = !hasChecked || uploadedFiles.length === 0;
 
     if (worker) {
         worker.terminate();
@@ -335,6 +511,10 @@ function renderPreviewTable(rows) {
     previewPlaceholder.style.display = 'none';
     previewTable.style.display = 'table';
 }
+
+// ==========================================
+// Download & Reset
+// ==========================================
 
 // Download Button Event
 downloadBtn.addEventListener('click', () => {
@@ -381,34 +561,21 @@ resetBtn.addEventListener('click', () => {
     downloadBtn.disabled = true;
     toggleInputs(false);
     
-    // Reset checkboxes to default values
+    // Clear dynamic action dropdown
+    actionItemsContainer.innerHTML = '';
+    detectedActions = [];
     selectAllCheckbox.checked = false;
-    checkboxes.forEach(cb => {
-        if (cb.value === "Read" || cb.value === "Created" || cb.value === "Created public link") {
-            cb.checked = true;
-        } else {
-            cb.checked = false;
-        }
-    });
     updateSelectedActionsText();
+    processBtn.disabled = true;
 
     // Log reset
     consolePanel.innerHTML = '';
     addConsoleLog('System state reset. Upload multiple CSV logs to start processing.', 'info');
 });
 
-// --- Custom Multiselect Event Listeners ---
-function updateSelectedActionsText() {
-    const selected = Array.from(checkboxes)
-        .filter(cb => cb.checked)
-        .map(cb => cb.value);
-    
-    if (selected.length === 0) {
-        selectedActionsText.textContent = "Select actions...";
-    } else {
-        selectedActionsText.textContent = selected.join(', ');
-    }
-}
+// ==========================================
+// Dropdown UI Events
+// ==========================================
 
 // Toggle dropdown visibility
 dropdownTrigger.addEventListener('click', (e) => {
@@ -430,17 +597,13 @@ document.addEventListener('click', (e) => {
 // Listen to Select All checkbox change
 selectAllCheckbox.addEventListener('change', () => {
     const isChecked = selectAllCheckbox.checked;
-    checkboxes.forEach(cb => {
+    const actionCheckboxes = getActionCheckboxes();
+    actionCheckboxes.forEach(cb => {
         cb.checked = isChecked;
     });
     updateSelectedActionsText();
-});
-
-// Listen to checkbox changes
-checkboxes.forEach(cb => {
-    cb.addEventListener('change', () => {
-        const allChecked = Array.from(checkboxes).every(c => c.checked);
-        selectAllCheckbox.checked = allChecked;
-        updateSelectedActionsText();
-    });
+    
+    // Enable process button if we have files and at least one checkbox is selected
+    const hasChecked = actionCheckboxes.some(cb => cb.checked);
+    processBtn.disabled = !hasChecked || uploadedFiles.length === 0;
 });

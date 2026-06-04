@@ -45,10 +45,10 @@ function parseCSVLine(text) {
 
 async function processCSVFiles(files, emailColConfig, actionColConfig, actionFilters) {
     let globalLog = [];
-    function log(message, type = 'info') {
+    function log(message, logLevel = 'info') {
         const timestamp = new Date().toLocaleTimeString();
-        globalLog.push({ timestamp, message, type });
-        self.postMessage({ type: 'LOG', timestamp, message, type });
+        globalLog.push({ timestamp, message, logLevel });
+        self.postMessage({ type: 'LOG', timestamp, message, logLevel });
     }
 
     log(`Starting processing of ${files.length} file(s)...`, 'info');
@@ -57,14 +57,12 @@ async function processCSVFiles(files, emailColConfig, actionColConfig, actionFil
     let totalMatchingActions = 0;
     let totalAdobeExcluded = 0;
     
-    // Master list of unique email records: { email, originFile, originalRowIndex }
+    // Master list of unique email records: { email, originFile }
     // We append files in sequence.
-    // The user requested:
     // File 1 adds unique emails to Column A.
     // File 2 adds unique emails starting after File 1's last email.
     // At the end, remove duplicates across the entire master list.
     let masterEmails = [];
-    let masterEmailsSet = new Set();
     
     // Column indices (detected or mapped)
     let emailColIdx = -1;
@@ -150,17 +148,17 @@ async function processCSVFiles(files, emailColConfig, actionColConfig, actionFil
                 
                 const email = fields[currentEmailIdx] ? fields[currentEmailIdx].trim() : '';
                 
-                // Check action filter
+                // Check action filter using EXACT case-insensitive match
                 let actionMatch = false;
                 if (currentActionIdx !== -1 && fields[currentActionIdx]) {
                     const actionVal = fields[currentActionIdx].trim().toLowerCase();
-                    actionMatch = actionFilters.some(filter => actionVal.includes(filter) || filter.includes(actionVal));
+                    actionMatch = actionFilters.some(filter => actionVal === filter);
                 } else {
                     // Fallback: search across all fields if action column is not defined
                     for (let f = 0; f < fields.length; f++) {
                         if (f === currentEmailIdx) continue;
                         const val = fields[f].trim().toLowerCase();
-                        if (actionFilters.some(filter => val.includes(filter) || filter.includes(val))) {
+                        if (actionFilters.some(filter => val === filter)) {
                             actionMatch = true;
                             break;
                         }
@@ -208,12 +206,12 @@ async function processCSVFiles(files, emailColConfig, actionColConfig, actionFil
             let actionMatch = false;
             if (currentActionIdx !== -1 && fields[currentActionIdx]) {
                 const actionVal = fields[currentActionIdx].trim().toLowerCase();
-                actionMatch = actionFilters.some(filter => actionVal.includes(filter) || filter.includes(actionVal));
+                actionMatch = actionFilters.some(filter => actionVal === filter);
             } else {
                 for (let f = 0; f < fields.length; f++) {
                     if (f === currentEmailIdx) continue;
                     const val = fields[f].trim().toLowerCase();
-                    if (actionFilters.some(filter => val.includes(filter) || filter.includes(val))) {
+                    if (actionFilters.some(filter => val === filter)) {
                         actionMatch = true;
                         break;
                     }
