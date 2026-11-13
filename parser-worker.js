@@ -2,7 +2,7 @@
 // Extracts schools and extensions from email domains and calculates unique counts per school
 
 self.onmessage = async function(e) {
-    const { files, emailColConfig, actionColConfig, actionValuesRaw } = e.data;
+    const { files, emailColConfig, actionColConfig, actionValuesRaw, customOrgExtensions } = e.data;
     
     // Parse action values list (e.g. "Read, Create, Create with public Link")
     const actionFilters = actionValuesRaw
@@ -11,7 +11,7 @@ self.onmessage = async function(e) {
         .filter(v => v.length > 0);
 
     try {
-        const result = await processCSVFiles(files, emailColConfig, actionColConfig, actionFilters);
+        const result = await processCSVFiles(files, emailColConfig, actionColConfig, actionFilters, customOrgExtensions);
         self.postMessage({ type: 'COMPLETE', data: result });
     } catch (err) {
         self.postMessage({ type: 'ERROR', message: err.message });
@@ -44,8 +44,41 @@ function parseCSVLine(text) {
     return fields;
 }
 
+// Official School Email Extensions Mapping from Org_Email_Extensions_Complete.xlsx
+const DEFAULT_OFFICIAL_ORG_EXTENSIONS = {
+    "u1.kgbvup.in": "KGBV 2",
+    "u1.schooluk.org": "Uttarakhand 2",
+    "sgoaedu.org": "South Goa",
+    "d1.delhiedu.org": "Delhi Directorate 2",
+    "pmshriup.org": "PM SHRI 1",
+    "schooluk.org": "Uttarakhand 1",
+    "kgbvup.in": "KGBV 1",
+    "cmshridl.org": "CM SHRI",
+    "swdupedu.in": "Samaj Kalyan",
+    "awesv.in": "Vidhyanjali",
+    "cv.aeedu.in": "Chinmaya",
+    "sfsinstitutionsswip.in": "SFS",
+    "awesaps.in": "Army",
+    "abs.aeedu.in": "Aditya Birla",
+    "kle.aeedu.in": "KLE",
+    "aees.aeedu.in": "Atomic Energy",
+    "pw.aecurate.in": "Physics Wallah",
+    "ggs.aespark.in": "Gajera",
+    "desp.aecurate.in": "Deccan",
+    "pp.aecurate.in": "Poornaprajna",
+    "u2.schooluk.org": "Uttarakhand 3 / CSR",
+    "u3.schooluk.org": "Uttarakhand 4 / CSR",
+    "u4.schooluk.org": "Uttarakhand 5 / CSR",
+    "gf.sledu.in": "SL Gujarat 1",
+    "gs.sledu.in": "SL Gujarat 2",
+    "hp.sledu.in": "SL Chamba",
+    "us.sledu.in": "SL US Uttarakhand 2"
+};
+
 // Domain to School Name Extraction Engine
-function extractSchoolInfoFromEmail(email) {
+// 1. Matches against Org_Email_Extensions_Complete.xlsx official mappings
+// 2. Fallback: Intelligent heuristic extraction from the @ of the email
+function extractSchoolInfoFromEmail(email, orgExtensionsMap = DEFAULT_OFFICIAL_ORG_EXTENSIONS) {
     if (!email) return null;
     const atIdx = email.lastIndexOf('@');
     if (atIdx === -1) return null;
@@ -54,21 +87,41 @@ function extractSchoolInfoFromEmail(email) {
     if (!domain) return null;
     
     const extension = '@' + domain;
-    
-    // Check known domain mappings
     let schoolName = '';
-    
+
+    const extLookup = orgExtensionsMap || DEFAULT_OFFICIAL_ORG_EXTENSIONS;
+
+    // 1. Exact match in official extensions (e.g. u1.kgbvup.in -> KGBV 2)
+    if (extLookup && extLookup[domain]) {
+        schoolName = extLookup[domain];
+        return { domain, extension, schoolName, isOfficial: true };
+    }
+
+    // 2. Subdomain match (e.g. student.u1.kgbvup.in -> u1.kgbvup.in -> KGBV 2)
+    // Keys sorted descending by length to respect whole domain specificity
+    if (extLookup) {
+        const sortedKeys = Object.keys(extLookup).sort((a, b) => b.length - a.length);
+        for (const key of sortedKeys) {
+            if (domain.endsWith('.' + key)) {
+                schoolName = extLookup[key];
+                return { domain, extension, schoolName, isOfficial: true };
+            }
+        }
+    }
+
+    // 3. Fallback extraction: domain does not belong to Org_Email_Extensions_Complete.xlsx
+    // Extracts clean, readable name from the @ of the email
     if (domain.includes('pmshri')) {
         schoolName = 'PM Shri';
     } else if (domain.includes('goa')) {
-        schoolName = domain.includes('dhe') ? 'Goa (DHE)' : 'Goa';
+        schoolName = domain.includes('dhe') ? 'Goa (DHE)' : (domain.includes('sgoa') ? 'South Goa' : (domain.includes('ngoa') ? 'North Goa' : 'Goa'));
     } else if (domain.includes('delhi') || domain.includes('edudel')) {
         schoolName = 'Delhi';
     } else if (domain.includes('kgbv')) {
         schoolName = 'KGBV';
     } else if (domain.includes('gujarat')) {
         schoolName = 'Gujarat';
-    } else if (domain.includes('uk.gov') || domain.includes('uttarakhand')) {
+    } else if (domain.includes('uk.gov') || domain.includes('uttarakhand') || domain.includes('schooluk')) {
         schoolName = 'Uttarakhand';
     } else if (domain.includes('kvs') || domain.includes('kvsangathan')) {
         schoolName = 'Kendriya Vidyalaya (KVS)';
@@ -114,11 +167,12 @@ function extractSchoolInfoFromEmail(email) {
     return {
         domain,
         extension,
-        schoolName
+        schoolName,
+        isOfficial: false
     };
 }
 
-async function processCSVFiles(files, emailColConfig, actionColConfig, actionFilters) {
+async function processCSVFiles(files, emailColConfig, actionColConfig, actionFilters, customOrgExtensions) {
     let globalLog = [];
     function log(message, logLevel = 'info') {
         const timestamp = new Date().toLocaleTimeString();
@@ -126,7 +180,11 @@ async function processCSVFiles(files, emailColConfig, actionColConfig, actionFil
         self.postMessage({ type: 'LOG', timestamp, message, logLevel });
     }
 
+    const activeOrgExtensions = customOrgExtensions || DEFAULT_OFFICIAL_ORG_EXTENSIONS;
+    const mappingCount = Object.keys(activeOrgExtensions).length;
+
     log(`Starting multi-school processing of ${files.length} file(s)...`, 'info');
+    log(`Active dictionary: ${mappingCount} official school extension mappings loaded from Org_Email_Extensions_Complete.xlsx`, 'info');
 
     let totalRawRecords = 0;
     let totalMatchingActions = 0;
@@ -235,7 +293,7 @@ async function processCSVFiles(files, emailColConfig, actionColConfig, actionFil
                             totalAdobeExcluded++;
                         } else {
                             const lowerEmail = email.toLowerCase();
-                            const schoolInfo = extractSchoolInfoFromEmail(lowerEmail);
+                            const schoolInfo = extractSchoolInfoFromEmail(lowerEmail, activeOrgExtensions);
                             
                             if (schoolInfo) {
                                 if (!schoolGroups.has(schoolInfo.extension)) {
@@ -304,7 +362,7 @@ async function processCSVFiles(files, emailColConfig, actionColConfig, actionFil
                         totalAdobeExcluded++;
                     } else {
                         const lowerEmail = email.toLowerCase();
-                        const schoolInfo = extractSchoolInfoFromEmail(lowerEmail);
+                        const schoolInfo = extractSchoolInfoFromEmail(lowerEmail, activeOrgExtensions);
                         
                         if (schoolInfo) {
                             if (!schoolGroups.has(schoolInfo.extension)) {

@@ -11,6 +11,7 @@ let worker = null;
 let masterBlobUrl = null;
 let currentBatchSchools = []; // Schools detected in current batch
 let detectedActions = []; // Dynamically detected action values from CSV
+let loadedOrgExtensions = null; // Official school email extensions loaded from Org_Email_Extensions_Complete.xlsx
 
 const WEEKLY_STORAGE_KEY = 'dataflow_weekly_school_records_v1';
 const LEGACY_STORAGE_KEY = 'dataflow_school_records_v1';
@@ -106,7 +107,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderWeeklyTabs();
     renderWeeklyLedger();
+
+    // Load official school extensions from Org_Email_Extensions_Complete.xlsx
+    loadDefaultOrgExtensionsFromExcel();
 });
+
+// ==========================================
+// Official School Org Extensions Engine
+// ==========================================
+function extractExtensionsFromWorkbook(workbook) {
+    if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) return null;
+    const sheetName = workbook.SheetNames.includes('Extensions') ? 'Extensions' : workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) return null;
+
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    if (!rows || rows.length === 0) return null;
+
+    const map = {};
+    let orgCol = -1;
+    let extCol = -1;
+
+    for (let r = 0; r < rows.length; r++) {
+        const row = rows[r];
+        if (!Array.isArray(row)) continue;
+
+        // Detect header row columns
+        for (let c = 0; c < row.length; c++) {
+            const val = String(row[c] || '').trim().toLowerCase();
+            if (val === 'org' || val === 'school' || val === 'school name' || val === 'organization') orgCol = c;
+            if (val === 'email extension' || val === 'extension' || val === 'domain' || val === 'email domain') extCol = c;
+        }
+
+        if (orgCol !== -1 && extCol !== -1 && r > 0) {
+            const org = String(row[orgCol] || '').trim();
+            let ext = String(row[extCol] || '').trim().toLowerCase();
+            if (ext.startsWith('@')) ext = ext.slice(1);
+            if (org && ext && ext.includes('.') && !ext.includes('email extension')) {
+                map[ext] = org;
+            }
+        }
+    }
+    return Object.keys(map).length > 0 ? map : null;
+}
+
+async function loadDefaultOrgExtensionsFromExcel() {
+    try {
+        const response = await fetch('Org_Email_Extensions_Complete.xlsx');
+        if (!response.ok) return;
+        const arrayBuffer = await response.arrayBuffer();
+        if (typeof XLSX !== 'undefined') {
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            const extMap = extractExtensionsFromWorkbook(workbook);
+            if (extMap && Object.keys(extMap).length > 0) {
+                loadedOrgExtensions = extMap;
+                addConsoleLog(`Loaded ${Object.keys(extMap).length} official school extensions from Org_Email_Extensions_Complete.xlsx`, 'info');
+            }
+        }
+    } catch (e) {
+        // Built-in dictionary in worker handles mappings seamlessly
+        console.log('Using default built-in org extensions mapping', e);
+    }
+}
 
 // ==========================================
 // Storage & Migration Helpers
@@ -539,10 +601,38 @@ fileInput.addEventListener('change', async (e) => {
 });
 
 async function handleFilesSelected(newFiles) {
+    // 1. Check for Excel school extension files (.xlsx, .xls)
+    const excelFiles = newFiles.filter(f => f.name.toLowerCase().endsWith('.xlsx') || f.name.toLowerCase().endsWith('.xls'));
+    if (excelFiles.length > 0) {
+        for (const ef of excelFiles) {
+            try {
+                const arrayBuf = await ef.arrayBuffer();
+                if (typeof XLSX !== 'undefined') {
+                    const wb = XLSX.read(arrayBuf, { type: 'array' });
+                    const extMap = extractExtensionsFromWorkbook(wb);
+                    if (extMap && Object.keys(extMap).length > 0) {
+                        loadedOrgExtensions = extMap;
+                        addConsoleLog(`Loaded ${Object.keys(extMap).length} school extension mappings from "${ef.name}".`, 'success');
+                        showToast(`Loaded ${Object.keys(extMap).length} school extensions from "${ef.name}"!`, 'success');
+                    } else {
+                        showToast(`No school extension mappings found in "${ef.name}".`, 'warning');
+                    }
+                }
+            } catch (err) {
+                console.error('Error parsing uploaded Excel file:', err);
+                showToast(`Failed to parse "${ef.name}": ${err.message}`, 'error');
+            }
+        }
+    }
+
+    // 2. Filter CSV log files
     const csvFiles = newFiles.filter(f => f.name.toLowerCase().endsWith('.csv') || f.type.includes('csv') || f.type === 'text/plain');
 
     if (csvFiles.length === 0) {
-        showToast('Only CSV log files are supported.', 'error');
+        if (excelFiles.length > 0) {
+            return; // Successfully updated extensions without needing CSV logs
+        }
+        showToast('Please upload CSV log files or school extension Excel files (.xlsx).', 'error');
         return;
     }
 
@@ -851,13 +941,14 @@ processBtn.addEventListener('click', () => {
     addConsoleLog(`Starting weekly multi-school analysis for week "${weekRange}" (${uploadedFiles.length} file(s))...`, 'info');
     addConsoleLog(`Active action filters: ${actionValues}`, 'info');
 
-    worker = new Worker('parser-worker.js?v=3.0.0');
+    worker = new Worker('parser-worker.js?v=3.1.0');
 
     worker.postMessage({
         files: uploadedFiles,
         emailColConfig: 'auto',
         actionColConfig: 'auto',
-        actionValuesRaw: actionValues
+        actionValuesRaw: actionValues,
+        customOrgExtensions: loadedOrgExtensions
     });
 
     worker.onmessage = function(e) {

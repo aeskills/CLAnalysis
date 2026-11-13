@@ -42,8 +42,8 @@
                         <path d="m16 16-4-4-4 4"></path>
                     </svg>
                     <p><strong>Drag &amp; drop 7-9 content logs</strong> or <span class="highlight">browse</span></p>
-                    <span class="upload-hint">Upload weekly content dumps for all schools together (.csv)</span>
-                    <input type="file" id="fileInput" multiple accept=".csv" style="display: none;">
+                    <span class="upload-hint">Upload weekly content dumps (.csv) or school extensions (.xlsx)</span>
+                    <input type="file" id="fileInput" multiple accept=".csv,.xlsx,.xls" style="display: none;">
                 </div>
 
                 <div class="file-list" id="fileList">
@@ -340,6 +340,6 @@
 
     <!-- SheetJS for multi-sheet Excel (.xlsx) export -->
     <script src="xlsx.full.min.js"></script>
-    <script src="app.js?v=3.0.6"></script>
+    <script src="app.js?v=3.0.7"></script>
 </body>
 </html>
