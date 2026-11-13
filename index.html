@@ -62,22 +62,60 @@
                     Weekly Batch &amp; Filters
                 </h2>
 
-                <!-- Week Date Range Input (Replaces School Name) -->
-                <div class="config-group">
+                <!-- Week Date Range Input with Custom Calendar Picker -->
+                <div class="config-group" id="weekDateRangeGroup" style="position: relative;">
                     <label for="weekDateRangeInput">
                         <span>Week Date Range</span>
                         <span class="auto-badge" id="weekRangeBadge">Weekly Tab</span>
                     </label>
-                    <div class="input-wrapper">
-                        <input type="text" id="weekDateRangeInput" class="config-input" placeholder="e.g. 31st Oct - 5th Nov, 6th Nov - 11th Nov" autocomplete="off">
+                    <div class="input-wrapper date-picker-wrapper">
+                        <button type="button" class="calendar-icon-btn" id="calendarToggleBtn" title="Open Calendar to select week">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                        </button>
+                        <input type="text" id="weekDateRangeInput" class="config-input date-input-with-cal" placeholder="Click calendar to select week (e.g. 5th Nov - 11th Nov)" autocomplete="off">
                         <button type="button" class="input-clear-btn" id="clearWeekRangeBtn" title="Clear date range" style="display: none;">✕</button>
                     </div>
+
+                    <!-- Custom Glassmorphic Calendar Dropdown -->
+                    <div class="calendar-dropdown" id="calendarDropdown" style="display: none;">
+                        <div class="calendar-header">
+                            <button type="button" class="cal-nav-btn" id="calPrevMonth" title="Previous Month">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                            </button>
+                            <span class="cal-month-title" id="calMonthTitle">November 2026</span>
+                            <button type="button" class="cal-nav-btn" id="calNextMonth" title="Next Month">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </button>
+                        </div>
+                        <div class="cal-mode-selector">
+                            <button type="button" class="cal-mode-btn active" id="calModeWeek" title="Click any day to select the entire week">Whole Week</button>
+                            <button type="button" class="cal-mode-btn" id="calModeCustom" title="Click Start Date and End Date">Custom Range</button>
+                        </div>
+                        <div class="cal-weekdays">
+                            <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
+                        </div>
+                        <div class="cal-days-grid" id="calDaysGrid">
+                            <!-- Populated dynamically -->
+                        </div>
+                        <div class="cal-footer">
+                            <button type="button" class="cal-preset-btn" id="calPresetThisWeek">This Week</button>
+                            <button type="button" class="cal-preset-btn" id="calPresetLastWeek">Last Week</button>
+                            <button type="button" class="cal-preset-btn close-btn" id="calCloseBtn">Close</button>
+                        </div>
+                    </div>
+
                     <div class="week-quick-actions">
                         <button type="button" class="btn-quick-date" id="btnPresetThisWeek" title="Auto-fill current week">This Week</button>
                         <button type="button" class="btn-quick-date" id="btnPresetLastWeek" title="Auto-fill last week">Last Week</button>
                     </div>
-                    <span class="input-hint">Specify the week date range. All schools in this dump will be filed under this week tab.</span>
+                    <span class="input-hint">Select a week from the calendar. All schools in this dump will be filed under this week tab.</span>
                 </div>
+
 
                 <div class="config-group">
                     <label>Action Filter Values</label>
@@ -302,6 +340,6 @@
 
     <!-- SheetJS for multi-sheet Excel (.xlsx) export -->
     <script src="xlsx.full.min.js"></script>
-    <script src="app.js?v=3.0.5"></script>
+    <script src="app.js?v=3.0.6"></script>
 </body>
 </html>

@@ -31,6 +31,19 @@ const clearWeekRangeBtn = document.getElementById('clearWeekRangeBtn');
 const btnPresetThisWeek = document.getElementById('btnPresetThisWeek');
 const btnPresetLastWeek = document.getElementById('btnPresetLastWeek');
 
+// Calendar Picker Elements
+const calendarToggleBtn = document.getElementById('calendarToggleBtn');
+const calendarDropdown = document.getElementById('calendarDropdown');
+const calMonthTitle = document.getElementById('calMonthTitle');
+const calPrevMonth = document.getElementById('calPrevMonth');
+const calNextMonth = document.getElementById('calNextMonth');
+const calDaysGrid = document.getElementById('calDaysGrid');
+const calModeWeek = document.getElementById('calModeWeek');
+const calModeCustom = document.getElementById('calModeCustom');
+const calPresetThisWeek = document.getElementById('calPresetThisWeek');
+const calPresetLastWeek = document.getElementById('calPresetLastWeek');
+const calCloseBtn = document.getElementById('calCloseBtn');
+
 const dropdownTrigger = document.getElementById('dropdownTrigger');
 const dropdownMenu = document.getElementById('dropdownMenu');
 const selectedActionsText = document.getElementById('selectedActionsText');
@@ -188,15 +201,13 @@ function getWeekDateRangeString(offsetWeeks = 0) {
 // Quick Date Action buttons
 btnPresetThisWeek.addEventListener('click', () => {
     const val = getWeekDateRangeString(0);
-    weekDateRangeInput.value = val;
-    clearWeekRangeBtn.style.display = 'block';
+    setWeekDateRange(val);
     showToast(`Week date range set to: ${val}`, 'info');
 });
 
 btnPresetLastWeek.addEventListener('click', () => {
     const val = getWeekDateRangeString(-1);
-    weekDateRangeInput.value = val;
-    clearWeekRangeBtn.style.display = 'block';
+    setWeekDateRange(val);
     showToast(`Week date range set to: ${val}`, 'info');
 });
 
@@ -208,6 +219,294 @@ clearWeekRangeBtn.addEventListener('click', () => {
     weekDateRangeInput.value = '';
     clearWeekRangeBtn.style.display = 'none';
     weekDateRangeInput.focus();
+});
+
+// ==========================================
+// Interactive Week & Date Range Calendar Picker
+// ==========================================
+let calCurrentDate = new Date();
+let calMode = 'week'; // 'week' or 'custom'
+let calCustomStart = null;
+let calCustomEnd = null;
+
+function isSameDate(d1, d2) {
+    if (!d1 || !d2) return false;
+    return d1.getFullYear() === d2.getFullYear() &&
+           d1.getMonth() === d2.getMonth() &&
+           d1.getDate() === d2.getDate();
+}
+
+function setWeekDateRange(val) {
+    if (!weekDateRangeInput) return;
+    weekDateRangeInput.value = val;
+    if (clearWeekRangeBtn) clearWeekRangeBtn.style.display = 'block';
+    weekDateRangeInput.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function selectWeekFromDate(date) {
+    const target = new Date(date);
+    const day = target.getDay(); // 0 is Sun, 1 is Mon
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    
+    const monday = new Date(target);
+    monday.setDate(target.getDate() + diffToMonday);
+    
+    // 6-day academic/work week (Mon - Sat)
+    const saturday = new Date(monday);
+    saturday.setDate(monday.getDate() + 5);
+
+    const formattedRange = `${formatOrdinalDate(monday)} - ${formatOrdinalDate(saturday)}`;
+    setWeekDateRange(formattedRange);
+    renderCalendarGrid();
+    setTimeout(closeCalendar, 200);
+    showToast(`Week selected: ${formattedRange}`, 'info');
+}
+
+function handleCustomRangeClick(date) {
+    if (!calCustomStart || (calCustomStart && calCustomEnd)) {
+        calCustomStart = date;
+        calCustomEnd = null;
+        renderCalendarGrid();
+    } else {
+        calCustomEnd = date;
+        const start = calCustomStart < calCustomEnd ? calCustomStart : calCustomEnd;
+        const end = calCustomStart < calCustomEnd ? calCustomEnd : calCustomStart;
+        
+        const formattedRange = `${formatOrdinalDate(start)} - ${formatOrdinalDate(end)}`;
+        setWeekDateRange(formattedRange);
+        renderCalendarGrid();
+        setTimeout(closeCalendar, 200);
+        showToast(`Date range selected: ${formattedRange}`, 'info');
+    }
+}
+
+function renderCalendarGrid() {
+    if (!calDaysGrid || !calMonthTitle) return;
+    calDaysGrid.innerHTML = '';
+
+    const year = calCurrentDate.getFullYear();
+    const month = calCurrentDate.getMonth();
+
+    const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ];
+    calMonthTitle.textContent = `${monthNames[month]} ${year}`;
+
+    // First day of month (0 = Sun, 1 = Mon ... 6 = Sat)
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    // Convert Sunday=0 to Monday=0:
+    let startDayOfWeek = firstDay.getDay() - 1;
+    if (startDayOfWeek === -1) startDayOfWeek = 6;
+
+    const totalDays = lastDay.getDate();
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+
+    const today = new Date();
+    const isThisMonth = today.getFullYear() === year && today.getMonth() === month;
+
+    const days = [];
+
+    // Previous month overflow days
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+        const d = new Date(year, month - 1, prevMonthLastDay - i);
+        days.push({ date: d, isCurrentMonth: false });
+    }
+
+    // Current month days
+    for (let i = 1; i <= totalDays; i++) {
+        const d = new Date(year, month, i);
+        days.push({ date: d, isCurrentMonth: true });
+    }
+
+    // Next month overflow days
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+        const d = new Date(year, month + 1, i);
+        days.push({ date: d, isCurrentMonth: false });
+    }
+
+    days.forEach((dayObj, index) => {
+        const cell = document.createElement('div');
+        cell.className = 'cal-day-cell';
+        if (!dayObj.isCurrentMonth) cell.classList.add('other-month');
+
+        const dNum = dayObj.date.getDate();
+        cell.textContent = dNum;
+        cell.dataset.date = dayObj.date.toISOString();
+        cell.dataset.weekRow = Math.floor(index / 7);
+
+        if (isThisMonth && dayObj.isCurrentMonth && dNum === today.getDate()) {
+            cell.classList.add('today');
+        }
+
+        // Custom range active markers
+        if (calCustomStart && !calCustomEnd) {
+            if (isSameDate(dayObj.date, calCustomStart)) {
+                cell.classList.add('range-start');
+            }
+        } else if (calCustomStart && calCustomEnd) {
+            const start = calCustomStart < calCustomEnd ? calCustomStart : calCustomEnd;
+            const end = calCustomStart < calCustomEnd ? calCustomEnd : calCustomStart;
+            if (isSameDate(dayObj.date, start)) cell.classList.add('range-start');
+            if (isSameDate(dayObj.date, end)) cell.classList.add('range-end');
+            if (dayObj.date > start && dayObj.date < end) cell.classList.add('in-range');
+        }
+
+        // Hover events
+        cell.addEventListener('mouseenter', () => {
+            if (calMode === 'week') {
+                const row = cell.dataset.weekRow;
+                calDaysGrid.querySelectorAll(`.cal-day-cell[data-week-row="${row}"]`).forEach(c => {
+                    c.classList.add('week-hover');
+                });
+            } else if (calMode === 'custom' && calCustomStart && !calCustomEnd) {
+                const hoverDate = dayObj.date;
+                const start = calCustomStart < hoverDate ? calCustomStart : hoverDate;
+                const end = calCustomStart < hoverDate ? hoverDate : calCustomStart;
+                calDaysGrid.querySelectorAll('.cal-day-cell').forEach(c => {
+                    const cDate = new Date(c.dataset.date);
+                    if (cDate >= start && cDate <= end) {
+                        c.classList.add('in-range');
+                    } else {
+                        c.classList.remove('in-range');
+                    }
+                });
+            }
+        });
+
+        cell.addEventListener('mouseleave', () => {
+            if (calMode === 'week') {
+                calDaysGrid.querySelectorAll('.cal-day-cell').forEach(c => c.classList.remove('week-hover'));
+            }
+        });
+
+        cell.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (calMode === 'week') {
+                selectWeekFromDate(dayObj.date);
+            } else {
+                handleCustomRangeClick(dayObj.date);
+            }
+        });
+
+        calDaysGrid.appendChild(cell);
+    });
+}
+
+function openCalendar() {
+    if (!calendarDropdown) return;
+    calendarDropdown.style.display = 'block';
+    renderCalendarGrid();
+}
+
+function closeCalendar() {
+    if (!calendarDropdown) return;
+    calendarDropdown.style.display = 'none';
+}
+
+function toggleCalendar() {
+    if (!calendarDropdown) return;
+    if (calendarDropdown.style.display === 'block') {
+        closeCalendar();
+    } else {
+        openCalendar();
+    }
+}
+
+if (calendarToggleBtn) {
+    calendarToggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleCalendar();
+    });
+}
+
+if (weekDateRangeInput) {
+    weekDateRangeInput.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (calendarDropdown && calendarDropdown.style.display !== 'block') {
+            openCalendar();
+        }
+    });
+}
+
+if (calPrevMonth) {
+    calPrevMonth.addEventListener('click', (e) => {
+        e.stopPropagation();
+        calCurrentDate.setMonth(calCurrentDate.getMonth() - 1);
+        renderCalendarGrid();
+    });
+}
+
+if (calNextMonth) {
+    calNextMonth.addEventListener('click', (e) => {
+        e.stopPropagation();
+        calCurrentDate.setMonth(calCurrentDate.getMonth() + 1);
+        renderCalendarGrid();
+    });
+}
+
+if (calModeWeek) {
+    calModeWeek.addEventListener('click', (e) => {
+        e.stopPropagation();
+        calMode = 'week';
+        calModeWeek.classList.add('active');
+        if (calModeCustom) calModeCustom.classList.remove('active');
+        calCustomStart = null;
+        calCustomEnd = null;
+        renderCalendarGrid();
+    });
+}
+
+if (calModeCustom) {
+    calModeCustom.addEventListener('click', (e) => {
+        e.stopPropagation();
+        calMode = 'custom';
+        calModeCustom.classList.add('active');
+        if (calModeWeek) calModeWeek.classList.remove('active');
+        calCustomStart = null;
+        calCustomEnd = null;
+        renderCalendarGrid();
+    });
+}
+
+if (calPresetThisWeek) {
+    calPresetThisWeek.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const val = getWeekDateRangeString(0);
+        setWeekDateRange(val);
+        closeCalendar();
+        showToast(`Week date range set to: ${val}`, 'info');
+    });
+}
+
+if (calPresetLastWeek) {
+    calPresetLastWeek.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const val = getWeekDateRangeString(-1);
+        setWeekDateRange(val);
+        closeCalendar();
+        showToast(`Week date range set to: ${val}`, 'info');
+    });
+}
+
+if (calCloseBtn) {
+    calCloseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeCalendar();
+    });
+}
+
+document.addEventListener('click', (e) => {
+    if (calendarDropdown && calendarDropdown.style.display === 'block') {
+        if (!calendarDropdown.contains(e.target) && 
+            (!calendarToggleBtn || !calendarToggleBtn.contains(e.target)) && 
+            e.target !== weekDateRangeInput) {
+            closeCalendar();
+        }
+    }
 });
 
 // ==========================================
