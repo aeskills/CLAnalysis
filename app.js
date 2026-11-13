@@ -244,20 +244,20 @@ function formatOrdinalDate(date) {
     return `${day}${suffix} ${month}`;
 }
 
-// Returns e.g. "31st Oct - 5th Nov" for week offset (0 = this week, -1 = last week)
+// Returns e.g. "7th Nov - 13th Nov" for week offset (0 = this week, -1 = last week), running Saturday to Friday
 function getWeekDateRangeString(offsetWeeks = 0) {
     const now = new Date();
-    // Anchor to Monday of the target week
-    const currentDay = now.getDay(); // 0 is Sun, 1 is Mon
-    const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    // Anchor to Saturday of the target week (Saturday to Friday cycle)
+    const currentDay = now.getDay(); // 0 is Sun, 1 is Mon ... 5 is Fri, 6 is Sat
+    const diffToSaturday = -((currentDay + 1) % 7);
     
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMonday + (offsetWeeks * 7));
+    const saturday = new Date(now);
+    saturday.setDate(now.getDate() + diffToSaturday + (offsetWeeks * 7));
     
-    const saturday = new Date(monday);
-    saturday.setDate(monday.getDate() + 5); // 6-day academic / work week (Mon - Sat)
+    const friday = new Date(saturday);
+    friday.setDate(saturday.getDate() + 6); // 7-day week (Sat - Fri)
 
-    return `${formatOrdinalDate(monday)} - ${formatOrdinalDate(saturday)}`;
+    return `${formatOrdinalDate(saturday)} - ${formatOrdinalDate(friday)}`;
 }
 
 // Quick Date Action buttons
@@ -307,21 +307,21 @@ function setWeekDateRange(val) {
 
 function selectWeekFromDate(date) {
     const target = new Date(date);
-    const day = target.getDay(); // 0 is Sun, 1 is Mon
-    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const day = target.getDay(); // 0 is Sun, 1 is Mon ... 5 is Fri, 6 is Sat
+    const diffToSaturday = -((day + 1) % 7);
     
-    const monday = new Date(target);
-    monday.setDate(target.getDate() + diffToMonday);
+    const saturday = new Date(target);
+    saturday.setDate(target.getDate() + diffToSaturday);
     
-    // 6-day academic/work week (Mon - Sat)
-    const saturday = new Date(monday);
-    saturday.setDate(monday.getDate() + 5);
+    // 7-day week (Sat - Fri)
+    const friday = new Date(saturday);
+    friday.setDate(saturday.getDate() + 6);
 
-    const formattedRange = `${formatOrdinalDate(monday)} - ${formatOrdinalDate(saturday)}`;
+    const formattedRange = `${formatOrdinalDate(saturday)} - ${formatOrdinalDate(friday)}`;
     setWeekDateRange(formattedRange);
     renderCalendarGrid();
     setTimeout(closeCalendar, 200);
-    showToast(`Week selected: ${formattedRange}`, 'info');
+    showToast(`Week selected (Sat - Fri): ${formattedRange}`, 'info');
 }
 
 function handleCustomRangeClick(date) {
@@ -359,9 +359,8 @@ function renderCalendarGrid() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
 
-    // Convert Sunday=0 to Monday=0:
-    let startDayOfWeek = firstDay.getDay() - 1;
-    if (startDayOfWeek === -1) startDayOfWeek = 6;
+    // Week starts on Saturday (Sat=0, Sun=1, Mon=2, Tue=3, Wed=4, Thu=5, Fri=6):
+    const startDayOfWeek = (firstDay.getDay() + 1) % 7;
 
     const totalDays = lastDay.getDate();
     const prevMonthLastDay = new Date(year, month, 0).getDate();
