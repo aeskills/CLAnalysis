@@ -10,13 +10,20 @@ def generate_mock_csv(filename, num_records):
         "Delete", "Update", "Download", "Login", "Share"
     ]
     
-    domains = ["gmail.com", "yahoo.com", "outlook.com", "company.org", "adobe.com"]
-    first_names = ["alex", "jordan", "taylor", "morgan", "sam", "jamie", "casey", "robin", "drew", "skyler"]
-    last_names = ["smith", "jones", "miller", "davis", "garcia", "rodriguez", "wilson", "martinez", "anderson", "taylor"]
+    domains = [
+        "pmshri.education.gov.in",
+        "goa.gov.in",
+        "edudel.nic.in",
+        "kgbv.gov.in",
+        "gujarat.gov.in",
+        "uk.gov.in",
+        "adobe.com"
+    ]
+    first_names = ["alex", "jordan", "taylor", "morgan", "sam", "jamie", "casey", "robin", "drew", "skyler", "priya", "rahul", "aarav", "ananya", "rohit"]
+    last_names = ["smith", "jones", "sharma", "patel", "singh", "kumar", "das", "fernandes", "verma", "joshi"]
 
-    # Pre-generate some unique emails to control duplicates
     unique_pool = []
-    for _ in range(int(num_records * 0.4)):  # 40% of records will be unique emails
+    for _ in range(int(num_records * 0.4)):
         fname = random.choice(first_names)
         lname = random.choice(last_names)
         domain = random.choice(domains)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Content Log Analysis - CSV Processor</title>
+    <title>Content Log Analysis - Multi-School Weekly Processor</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,7 +17,7 @@
                     </svg>
                 </div>
                 <h1>Content Log Analysis</h1>
-                <span>CSV Processor</span>
+                <span>Multi-School Weekly Processor</span>
             </div>
             <div></div>
         </div>
@@ -33,18 +33,17 @@
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    Upload CSV Files
+                    Multi-School Upload
                 </h2>
-                
                 <div class="upload-zone" id="uploadZone">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="12" y1="8" x2="12" y2="16"></line>
-                        <line x1="8" y1="12" x2="16" y2="12"></line>
+                        <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                        <path d="M12 12v9"></path>
+                        <path d="m16 16-4-4-4 4"></path>
                     </svg>
-                    <h3>Drag & Drop CSVs here</h3>
-                    <p>or click to browse local files</p>
-                    <input type="file" id="fileInput" class="file-input" multiple accept=".csv">
+                    <p><strong>Drag &amp; drop 7-9 content logs</strong> or <span class="highlight">browse</span></p>
+                    <span class="upload-hint">Upload weekly content dumps for all schools together (.csv)</span>
+                    <input type="file" id="fileInput" multiple accept=".csv" style="display: none;">
                 </div>
 
                 <div class="file-list" id="fileList">
@@ -55,23 +54,29 @@
             <div class="glass-card">
                 <h2 class="card-title">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
                     </svg>
-                    Batch & Column Mapping
+                    Weekly Batch &amp; Filters
                 </h2>
 
-                <!-- School / Batch Name Input -->
+                <!-- Week Date Range Input (Replaces School Name) -->
                 <div class="config-group">
-                    <label for="schoolNameInput">
-                        <span>School Name (Column A)</span>
-                        <span class="auto-badge" id="schoolNameAutoBadge" style="display: none;">Auto-detected</span>
+                    <label for="weekDateRangeInput">
+                        <span>Week Date Range</span>
+                        <span class="auto-badge" id="weekRangeBadge">Weekly Tab</span>
                     </label>
                     <div class="input-wrapper">
-                        <input type="text" id="schoolNameInput" class="config-input" placeholder="e.g. KGBV 1, PMShri 1, Uttrakhand 2..." autocomplete="off">
-                        <button type="button" class="input-clear-btn" id="clearSchoolNameBtn" title="Clear name" style="display: none;">✕</button>
+                        <input type="text" id="weekDateRangeInput" class="config-input" placeholder="e.g. 31st Oct - 5th Nov, 6th Nov - 11th Nov" autocomplete="off">
+                        <button type="button" class="input-clear-btn" id="clearWeekRangeBtn" title="Clear date range" style="display: none;">✕</button>
                     </div>
-                    <span class="input-hint">Auto-detected from file name. Editable anytime.</span>
+                    <div class="week-quick-actions">
+                        <button type="button" class="btn-quick-date" id="btnPresetThisWeek" title="Auto-fill current week">This Week</button>
+                        <button type="button" class="btn-quick-date" id="btnPresetLastWeek" title="Auto-fill last week">Last Week</button>
+                    </div>
+                    <span class="input-hint">Specify the week date range. All schools in this dump will be filed under this week tab.</span>
                 </div>
 
                 <div class="config-group">
@@ -117,12 +122,16 @@
                     <div class="stat-val" id="statProcessed">0</div>
                 </div>
                 <div class="stat-card danger">
-                    <div class="stat-label">Filtered Emails</div>
+                    <div class="stat-label">Filtered Actions</div>
                     <div class="stat-val" id="statFiltered">0</div>
                 </div>
                 <div class="stat-card success">
-                    <div class="stat-label">Final Clean Emails</div>
+                    <div class="stat-label">Grand Unique Emails</div>
                     <div class="stat-val" id="statClean">0</div>
+                </div>
+                <div class="stat-card schools-card">
+                    <div class="stat-label">Schools Detected</div>
+                    <div class="stat-val" id="statSchools">0</div>
                 </div>
             </div>
 
@@ -151,12 +160,41 @@
                 </h2>
                 <div class="console-panel" id="consolePanel">
                     <div class="console-log info">
-                        <span class="timestamp">[10:00:00]</span>System ready. Upload multiple CSV logs to start processing.
+                        <span class="timestamp">[Ready]</span>System ready. Upload weekly content logs for multiple schools to begin.
                     </div>
                 </div>
             </div>
 
-            <!-- Table Preview -->
+            <!-- Current Batch School Breakdown Card -->
+            <div class="glass-card current-batch-card" id="currentBatchCard" style="display: none;">
+                <div class="card-header-flex">
+                    <div>
+                        <h2 class="card-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            Current Batch: Schools &amp; Extensions Detected
+                        </h2>
+                        <p class="card-subtitle" id="currentBatchSubtitle">Unique emails isolated separately for each school based on email extension.</p>
+                    </div>
+                    <div class="ledger-header-actions">
+                        <button class="btn-secondary btn-sm" id="downloadAllCombinedBtn" title="Download combined CSV containing all schools">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Download All Combined CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div class="schools-grid" id="currentSchoolsGrid">
+                    <!-- Populated dynamically with school cards -->
+                </div>
+            </div>
+
+            <!-- Table Preview (First 100 rows) -->
             <div class="glass-card">
                 <h2 class="card-title">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -173,8 +211,10 @@
                     <table class="preview-table" id="previewTable" style="display: none;">
                         <thead>
                             <tr>
-                                <th style="width: 80px;">Index</th>
+                                <th style="width: 60px;">#</th>
                                 <th>User Email</th>
+                                <th>School Name</th>
+                                <th>Extension</th>
                             </tr>
                         </thead>
                         <tbody id="previewTableBody">
@@ -193,14 +233,14 @@
                 </div>
             </div>
 
-            <!-- Download & Batch Actions -->
+            <!-- Download & Batch Reset Actions -->
             <div class="download-section">
                 <button class="btn-secondary" id="resetBtn">Reset</button>
-                <button class="btn-secondary btn-action-next" id="nextSchoolBtn" disabled title="Keep records in ledger and clear drop zone for the next school">
+                <button class="btn-secondary btn-action-next" id="nextBatchBtn" disabled title="Clear upload zone for the next week while keeping all records in weekly tabs">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="9 18 15 12 9 6"></polyline>
                     </svg>
-                    Next School Batch
+                    Next Week Batch
                 </button>
                 <button class="btn-secondary btn-success" id="downloadBtn" disabled>
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -208,11 +248,11 @@
                         <polyline points="7 10 12 15 17 10"></polyline>
                         <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
-                    Download Filtered CSV
+                    Download Master CSV
                 </button>
             </div>
 
-            <!-- School Record Ledger (Summary Table) Card -->
+            <!-- Weekly School Records Summary Ledger Card -->
             <div class="glass-card ledger-card" id="ledgerCard">
                 <div class="card-header-flex">
                     <div>
@@ -222,16 +262,20 @@
                                 <line x1="3" y1="9" x2="21" y2="9"></line>
                                 <line x1="9" y1="21" x2="9" y2="9"></line>
                             </svg>
-                            School Records Summary Ledger
+                            Weekly School Records Summary Ledger
                         </h2>
-                        <p class="card-subtitle">Permanent record of unique email counts across all schools. Ready to export to Excel anytime.</p>
+                        <p class="card-subtitle">Weekly tabs with school records: Column A (School Name), Column B (Extention), Column C (Unique Count). Multi-tab Excel export supported.</p>
                     </div>
                     <div class="ledger-header-actions">
-                        <button class="btn-secondary btn-sm" id="addManualRecordBtn" title="Add a manual entry">
+                        <button class="btn-secondary btn-sm" id="addNewWeekBtn" title="Create a new weekly tab">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                            Add Row
+                            + New Week Tab
                         </button>
-                        <button class="btn-excel" id="downloadRecordExcelBtn" title="Download Excel Record (Column A: School Name, Column B: Unique Count)">
+                        <button class="btn-secondary btn-sm" id="addManualRecordBtn" title="Add a manual school row to active week">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            Add School Row
+                        </button>
+                        <button class="btn-excel" id="downloadRecordExcelBtn" title="Download Excel Workbook (Each week as a separate tab: Column A: School Name, Column B: Extention, Column C: Unique Count)">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm2 14-2.5-3 2.5-3h-2l-1.5 2-1.5-2h-2l2.5 3-2.5 3h2l1.5-2 1.5 2h2zM13 9V3.5L18.5 9H13z"/>
                             </svg>
@@ -240,10 +284,21 @@
                     </div>
                 </div>
 
-                <!-- Ledger Metrics Summary Bar -->
+                <!-- Week Tabs Bar -->
+                <div class="week-tabs-container" id="weekTabsContainer">
+                    <div class="week-tabs-bar" id="weekTabsBar">
+                        <!-- Populated dynamically with weekly tabs (e.g. 31st Oct - 5th Nov, 6th Nov - 11th Nov) -->
+                    </div>
+                </div>
+
+                <!-- Ledger Metrics Summary Bar for Active Week -->
                 <div class="ledger-metrics-bar">
                     <div class="metric-pill">
-                        <span class="metric-label">Schools Processed</span>
+                        <span class="metric-label">Active Week Period</span>
+                        <span class="metric-value week-name-highlight" id="ledgerActiveWeekDisplay">No Week Selected</span>
+                    </div>
+                    <div class="metric-pill">
+                        <span class="metric-label">Schools in Week</span>
                         <span class="metric-value" id="ledgerSchoolsCount">0</span>
                     </div>
                     <div class="metric-pill success">
@@ -251,7 +306,9 @@
                         <span class="metric-value" id="ledgerTotalCount">0</span>
                     </div>
                     <div class="metric-pill action-pill">
-                        <button class="btn-link-danger" id="clearAllRecordsBtn" title="Clear all recorded schools">Clear Ledger</button>
+                        <button class="btn-link-danger" id="clearWeekRecordsBtn" title="Clear records for this week">Clear Week</button>
+                        <span class="pill-divider">|</span>
+                        <button class="btn-link-danger" id="clearAllRecordsBtn" title="Clear all weekly records">Clear All Weeks</button>
                     </div>
                 </div>
 
@@ -262,10 +319,9 @@
                             <tr>
                                 <th style="width: 50px;">#</th>
                                 <th>School Name (Column A)</th>
-                                <th style="text-align: right; width: 180px;">Unique Count (Column B)</th>
-                                <th style="width: 180px;">Date Processed</th>
-                                <th style="width: 140px;">Files</th>
-                                <th style="width: 110px; text-align: center;">Actions</th>
+                                <th style="width: 250px;">Extention (Column B)</th>
+                                <th style="text-align: right; width: 180px;">Unique Count (Column C)</th>
+                                <th style="width: 140px; text-align: center;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="ledgerTableBody">
@@ -279,8 +335,8 @@
                             <line x1="3" y1="9" x2="21" y2="9"></line>
                             <line x1="9" y1="21" x2="9" y2="9"></line>
                         </svg>
-                        <p>No school records yet.</p>
-                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Upload and process a school CSV (e.g. KGBV 1, PMShri 1) to automatically create a record here.</span>
+                        <p id="ledgerPlaceholderText">No weekly records yet.</p>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Upload content logs with a week date range (e.g. 31st Oct - 5th Nov) to automatically build the weekly record ledger.</span>
                     </div>
                 </div>
             </div>
@@ -292,23 +348,54 @@
         <div class="modal-card modal-card-sm">
             <div class="modal-header">
                 <div class="modal-title-flex">
-                    <h3>Add Manual School Record</h3>
+                    <h3>Add School Record</h3>
                 </div>
                 <button class="modal-close-btn" id="closeManualModalBtn">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="config-group">
-                    <label for="manualSchoolNameInput">School Name (Column A)</label>
-                    <input type="text" id="manualSchoolNameInput" class="config-input" placeholder="e.g. Uttrakhand 2, School lens Gujarat 1">
+                    <label for="manualWeekRangeInput">Week Date Range</label>
+                    <input type="text" id="manualWeekRangeInput" class="config-input" placeholder="e.g. 31st Oct - 5th Nov">
                 </div>
                 <div class="config-group">
-                    <label for="manualUniqueCountInput">Unique Count (Column B)</label>
+                    <label for="manualSchoolNameInput">School Name (Column A)</label>
+                    <input type="text" id="manualSchoolNameInput" class="config-input" placeholder="e.g. PM Shri, Goa, Delhi">
+                </div>
+                <div class="config-group">
+                    <label for="manualExtensionInput">Extention (Column B)</label>
+                    <input type="text" id="manualExtensionInput" class="config-input" placeholder="e.g. @pmshri.education.gov.in, @goa.gov.in">
+                </div>
+                <div class="config-group">
+                    <label for="manualUniqueCountInput">Unique Count (Column C)</label>
                     <input type="number" id="manualUniqueCountInput" class="config-input" placeholder="e.g. 1450" min="0">
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" id="cancelManualRecordBtn">Cancel</button>
                 <button class="btn-secondary btn-success" id="saveManualRecordBtn">Add to Ledger</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create New Week Modal -->
+    <div class="modal-backdrop" id="newWeekModal" style="display: none;">
+        <div class="modal-card modal-card-sm">
+            <div class="modal-header">
+                <div class="modal-title-flex">
+                    <h3>Create New Weekly Tab</h3>
+                </div>
+                <button class="modal-close-btn" id="closeNewWeekModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="config-group">
+                    <label for="newWeekRangeInput">Week Date Range</label>
+                    <input type="text" id="newWeekRangeInput" class="config-input" placeholder="e.g. 6th Nov - 11th Nov">
+                    <span class="input-hint">Creates a new tab in the ledger for this week's records.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancelNewWeekBtn">Cancel</button>
+                <button class="btn-secondary btn-success" id="confirmNewWeekBtn">Create Tab</button>
             </div>
         </div>
     </div>
@@ -322,6 +409,8 @@
         </div>
     </footer>
 
-    <script src="app.js?v=2.2.0"></script>
+    <!-- SheetJS for multi-sheet Excel (.xlsx) export -->
+    <script src="xlsx.full.min.js"></script>
+    <script src="app.js?v=3.0.0"></script>
 </body>
 </html>
