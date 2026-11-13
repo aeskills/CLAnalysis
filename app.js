@@ -61,11 +61,6 @@ const progressPercentText = document.getElementById('progressPercentText');
 const progressBarFill = document.getElementById('progressBarFill');
 const consolePanel = document.getElementById('consolePanel');
 
-// Current Batch School Breakdown (Image 1 Section)
-const currentBatchCard = document.getElementById('currentBatchCard');
-const currentBatchSubtitle = document.getElementById('currentBatchSubtitle');
-const currentSchoolsGrid = document.getElementById('currentSchoolsGrid');
-const downloadAllCombinedBtn = document.getElementById('downloadAllCombinedBtn');
 
 // Weekly School Records Ledger
 const ledgerCard = document.getElementById('ledgerCard');
@@ -565,8 +560,6 @@ processBtn.addEventListener('click', () => {
     progressPercentText.textContent = '0%';
     progressBarFill.style.width = '0%';
     
-    if (currentBatchCard) currentBatchCard.style.display = 'none';
-    if (currentSchoolsGrid) currentSchoolsGrid.innerHTML = '';
     unifiedDownloadBtn.disabled = true;
     nextBatchBtn.disabled = true;
 
@@ -680,9 +673,8 @@ function finishProcessing(result, weekRange) {
     statClean.textContent = result.stats.finalCleanCount.toLocaleString();
     statSchools.textContent = result.schoolsList.length.toLocaleString();
 
-    // Save current batch schools and render Image 1 section
+    // Save current batch schools
     currentBatchSchools = result.schoolsList;
-    renderCurrentSchoolsGrid(result.schoolsList, weekRange);
 
     // Set Master Combined CSV Blob
     const masterBlob = new Blob([result.masterCsvContent], { type: 'text/csv;charset=utf-8;' });
@@ -703,74 +695,6 @@ function finishProcessing(result, weekRange) {
     saveBatchSchoolsToWeek(weekRange, result.schoolsList);
 
     showToast(`Processed ${result.schoolsList.length} schools (${result.stats.finalCleanCount.toLocaleString()} clean emails) for ${weekRange}!`, 'success');
-}
-
-// ==========================================
-// Current Batch Schools Breakdown Cards (Image 1 Section)
-// ==========================================
-function renderCurrentSchoolsGrid(schools, weekRange) {
-    if (!currentSchoolsGrid || !currentBatchCard) return;
-    currentSchoolsGrid.innerHTML = '';
-    if (!schools || schools.length === 0) {
-        currentBatchCard.style.display = 'none';
-        return;
-    }
-
-    currentBatchCard.style.display = 'block';
-    if (currentBatchSubtitle) {
-        currentBatchSubtitle.textContent = `Detected ${schools.length} distinct school extension(s) in this week's content dump (${escapeHtml(weekRange)}).`;
-    }
-
-    schools.forEach((sch, index) => {
-        const card = document.createElement('div');
-        card.className = 'school-batch-card';
-        card.innerHTML = `
-            <div>
-                <div class="school-batch-header">
-                    <div class="school-batch-name">${escapeHtml(sch.schoolName)}</div>
-                    <div class="school-batch-count">${sch.uniqueCount.toLocaleString()}</div>
-                </div>
-                <div class="school-batch-ext-wrapper">
-                    <span class="school-batch-ext">${escapeHtml(sch.extension)}</span>
-                </div>
-                <div class="school-batch-label">Unique clean emails</div>
-            </div>
-            <button class="btn-download-school" onclick="downloadCurrentBatchSchoolCsv(${index})" title="Download CSV of clean emails for ${escapeHtml(sch.schoolName)}">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Download CSV
-            </button>
-        `;
-        currentSchoolsGrid.appendChild(card);
-    });
-}
-
-window.downloadCurrentBatchSchoolCsv = function(index) {
-    const sch = currentBatchSchools[index];
-    if (!sch || !sch.csvContent) {
-        showToast('CSV content not available.', 'error');
-        return;
-    }
-    const blob = new Blob([sch.csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const sanitizedName = sch.schoolName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${sanitizedName}_unique_emails.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast(`Downloaded clean emails for "${sch.schoolName}".`, 'success');
-};
-
-if (downloadAllCombinedBtn) {
-    downloadAllCombinedBtn.addEventListener('click', () => {
-        downloadMasterCsv();
-    });
 }
 
 // ==========================================
@@ -1204,8 +1128,6 @@ nextBatchBtn.addEventListener('click', () => {
     updateUploadStats();
 
     currentBatchSchools = [];
-    if (currentBatchCard) currentBatchCard.style.display = 'none';
-    if (currentSchoolsGrid) currentSchoolsGrid.innerHTML = '';
 
     progressBanner.style.display = 'none';
     progressBarFill.style.width = '0%';
@@ -1234,8 +1156,6 @@ resetBtn.addEventListener('click', () => {
         updateUploadStats();
 
         currentBatchSchools = [];
-        if (currentBatchCard) currentBatchCard.style.display = 'none';
-        if (currentSchoolsGrid) currentSchoolsGrid.innerHTML = '';
 
         progressBanner.style.display = 'none';
         
