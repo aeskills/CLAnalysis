@@ -165,6 +165,34 @@
                 </div>
             </div>
 
+            <!-- Current Batch School Breakdown Card (Image 1 Section) -->
+            <div class="glass-card current-batch-card" id="currentBatchCard" style="display: none;">
+                <div class="card-header-flex">
+                    <div>
+                        <h2 class="card-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            Current Batch: Schools &amp; Extensions Detected
+                        </h2>
+                        <p class="card-subtitle" id="currentBatchSubtitle">Detected 0 distinct school extension(s) in this week's content dump.</p>
+                    </div>
+                    <div class="ledger-header-actions">
+                        <button class="btn-secondary btn-sm" id="downloadAllCombinedBtn" title="Download combined CSV containing all schools">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Download All Combined CSV
+                        </button>
+                    </div>
+                </div>
+                <div class="schools-grid" id="currentSchoolsGrid">
+                    <!-- Cards populated dynamically -->
+                </div>
+            </div>
+
             <!-- Unified Weekly School Records Summary Ledger Card (One Section) -->
             <div class="glass-card ledger-card" id="ledgerCard">
                 <div class="card-header-flex">
@@ -287,45 +315,6 @@
                 </div>
             </div>
 
-            <!-- Table Preview (First 100 rows) -->
-            <div class="glass-card" style="margin-top: 1.5rem;">
-                <h2 class="card-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
-                    Clean Email Data Preview (First 100 rows)
-                </h2>
-                
-                <div class="table-container">
-                    <table class="preview-table" id="previewTable" style="display: none;">
-                        <thead>
-                            <tr>
-                                <th style="width: 60px;">#</th>
-                                <th>User Email</th>
-                                <th>School Name</th>
-                                <th>Extension</th>
-                            </tr>
-                        </thead>
-                        <tbody id="previewTableBody">
-                            <!-- Populated dynamically -->
-                        </tbody>
-                    </table>
-                    
-                    <div class="preview-placeholder" id="previewPlaceholder">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="9" y1="9" x2="15" y2="15"></line>
-                            <line x1="15" y1="9" x2="9" y2="15"></line>
-                        </svg>
-                        <p>No preview available. Process files to view filtered results.</p>
-                    </div>
-                </div>
-            </div>
-
             <!-- Download & Batch Reset Actions -->
             <div class="download-section">
                 <button class="btn-secondary" id="resetBtn">Reset</button>
@@ -407,6 +396,6 @@
 
     <!-- SheetJS for multi-sheet Excel (.xlsx) export -->
     <script src="xlsx.full.min.js"></script>
-    <script src="app.js?v=3.0.2"></script>
+    <script src="app.js?v=3.0.3"></script>
 </body>
 </html>
