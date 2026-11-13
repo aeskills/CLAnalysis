@@ -73,27 +73,8 @@ const ledgerTableBody = document.getElementById('ledgerTableBody');
 const ledgerPlaceholder = document.getElementById('ledgerPlaceholder');
 const ledgerPlaceholderText = document.getElementById('ledgerPlaceholderText');
 
-const addNewWeekBtn = document.getElementById('addNewWeekBtn');
-const addManualRecordBtn = document.getElementById('addManualRecordBtn');
 const clearWeekRecordsBtn = document.getElementById('clearWeekRecordsBtn');
 const clearAllRecordsBtn = document.getElementById('clearAllRecordsBtn');
-
-// Manual Add Modal
-const manualRecordModal = document.getElementById('manualRecordModal');
-const closeManualModalBtn = document.getElementById('closeManualModalBtn');
-const cancelManualRecordBtn = document.getElementById('cancelManualRecordBtn');
-const saveManualRecordBtn = document.getElementById('saveManualRecordBtn');
-const manualWeekRangeInput = document.getElementById('manualWeekRangeInput');
-const manualSchoolNameInput = document.getElementById('manualSchoolNameInput');
-const manualExtensionInput = document.getElementById('manualExtensionInput');
-const manualUniqueCountInput = document.getElementById('manualUniqueCountInput');
-
-// Create New Week Modal
-const newWeekModal = document.getElementById('newWeekModal');
-const closeNewWeekModalBtn = document.getElementById('closeNewWeekModalBtn');
-const cancelNewWeekBtn = document.getElementById('cancelNewWeekBtn');
-const confirmNewWeekBtn = document.getElementById('confirmNewWeekBtn');
-const newWeekRangeInput = document.getElementById('newWeekRangeInput');
 
 // Toast Container
 const toastContainer = document.getElementById('toastContainer');
@@ -1313,140 +1294,7 @@ clearAllRecordsBtn.addEventListener('click', () => {
     }
 });
 
-// ==========================================
-// Add Manual Record Modal
-// ==========================================
-addManualRecordBtn.addEventListener('click', () => {
-    manualWeekRangeInput.value = activeWeekRange || weekDateRangeInput.value.trim() || getWeekDateRangeString(0);
-    manualSchoolNameInput.value = '';
-    manualExtensionInput.value = '';
-    manualUniqueCountInput.value = '';
-    manualRecordModal.style.display = 'flex';
-    manualSchoolNameInput.focus();
-});
 
-function closeManualModal() {
-    manualRecordModal.style.display = 'none';
-}
-
-closeManualModalBtn.addEventListener('click', closeManualModal);
-cancelManualRecordBtn.addEventListener('click', closeManualModal);
-
-manualRecordModal.addEventListener('click', (e) => {
-    if (e.target === manualRecordModal) closeManualModal();
-});
-
-saveManualRecordBtn.addEventListener('click', () => {
-    const weekRange = manualWeekRangeInput.value.trim() || 'Current Week';
-    const schoolName = manualSchoolNameInput.value.trim();
-    let extension = manualExtensionInput.value.trim();
-    const count = parseInt(manualUniqueCountInput.value, 10);
-
-    if (!schoolName) {
-        showToast('Please enter a school name.', 'error');
-        manualSchoolNameInput.focus();
-        return;
-    }
-
-    if (isNaN(count) || count < 0) {
-        showToast('Please enter a valid unique count (0 or greater).', 'error');
-        manualUniqueCountInput.focus();
-        return;
-    }
-
-    if (extension && !extension.startsWith('@')) {
-        extension = '@' + extension;
-    }
-
-    let week = weeklyRecords.find(w => w.weekRange.toLowerCase() === weekRange.toLowerCase());
-    if (!week) {
-        week = {
-            weekRange: weekRange,
-            createdAt: new Date().toISOString(),
-            schools: []
-        };
-        weeklyRecords.unshift(week);
-    }
-
-    const newRecord = {
-        id: 'sch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        schoolName: schoolName,
-        extension: extension || '@manual.entry',
-        uniqueCount: count,
-        csvContent: null,
-        sampleEmails: []
-    };
-
-    week.schools.push(newRecord);
-    week.schools.sort((a, b) => a.schoolName.localeCompare(b.schoolName));
-
-    activeWeekRange = week.weekRange;
-    saveWeeklyRecords(weeklyRecords);
-    renderWeeklyTabs();
-    renderWeeklyLedger();
-
-    closeManualModal();
-    addConsoleLog(`Manually added "${schoolName}" (${count.toLocaleString()} unique emails) to week "${week.weekRange}".`, 'info');
-    showToast(`Added "${schoolName}" to week "${week.weekRange}"!`, 'success');
-});
-
-// ==========================================
-// New Week Tab Modal
-// ==========================================
-addNewWeekBtn.addEventListener('click', () => {
-    newWeekRangeInput.value = '';
-    newWeekRangeInput.placeholder = 'e.g. 6th Nov - 11th Nov';
-    newWeekModal.style.display = 'flex';
-    newWeekRangeInput.focus();
-});
-
-function closeNewWeekModal() {
-    newWeekModal.style.display = 'none';
-}
-
-closeNewWeekModalBtn.addEventListener('click', closeNewWeekModal);
-cancelNewWeekBtn.addEventListener('click', closeNewWeekModal);
-
-newWeekModal.addEventListener('click', (e) => {
-    if (e.target === newWeekModal) closeNewWeekModal();
-});
-
-confirmNewWeekBtn.addEventListener('click', () => {
-    const range = newWeekRangeInput.value.trim();
-    if (!range) {
-        showToast('Please enter a week date range.', 'error');
-        newWeekRangeInput.focus();
-        return;
-    }
-
-    let existing = weeklyRecords.find(w => w.weekRange.toLowerCase() === range.toLowerCase());
-    if (existing) {
-        activeWeekRange = existing.weekRange;
-        renderWeeklyTabs();
-        renderWeeklyLedger();
-        closeNewWeekModal();
-        showToast(`Switched to existing week "${existing.weekRange}".`, 'info');
-        return;
-    }
-
-    const newWeek = {
-        weekRange: range,
-        createdAt: new Date().toISOString(),
-        schools: []
-    };
-
-    weeklyRecords.unshift(newWeek);
-    activeWeekRange = range;
-    weekDateRangeInput.value = range;
-    clearWeekRangeBtn.style.display = 'block';
-
-    saveWeeklyRecords(weeklyRecords);
-    renderWeeklyTabs();
-    renderWeeklyLedger();
-
-    closeNewWeekModal();
-    showToast(`Created new weekly tab: "${range}"!`, 'success');
-});
 
 // ==========================================
 // Dropdown UI Events

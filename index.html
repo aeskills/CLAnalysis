@@ -180,15 +180,6 @@
                         <p class="card-subtitle">Weekly tabs with school records: Column A (School Name), Column B (Extention), Column C (Unique Count). Multi-tab Excel export & clean CSV downloads supported.</p>
                     </div>
                     <div class="ledger-header-actions">
-                        <button class="btn-secondary btn-sm" id="addNewWeekBtn" title="Create a new weekly tab">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                            + New Week Tab
-                        </button>
-                        <button class="btn-secondary btn-sm" id="addManualRecordBtn" title="Add a manual school row to active week">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                            Add School Row
-                        </button>
-                        
                         <!-- Unified Single Download Button (Combined, Different / Separate, Excel) -->
                         <div class="unified-download-group">
                             <button type="button" class="btn-unified-download" id="unifiedDownloadBtn" disabled title="Download Options">
@@ -300,63 +291,6 @@
         </section>
     </main>
 
-    <!-- Manual Record Add Modal -->
-    <div class="modal-backdrop" id="manualRecordModal" style="display: none;">
-        <div class="modal-card modal-card-sm">
-            <div class="modal-header">
-                <div class="modal-title-flex">
-                    <h3>Add School Record</h3>
-                </div>
-                <button class="modal-close-btn" id="closeManualModalBtn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="config-group">
-                    <label for="manualWeekRangeInput">Week Date Range</label>
-                    <input type="text" id="manualWeekRangeInput" class="config-input" placeholder="e.g. 31st Oct - 5th Nov">
-                </div>
-                <div class="config-group">
-                    <label for="manualSchoolNameInput">School Name (Column A)</label>
-                    <input type="text" id="manualSchoolNameInput" class="config-input" placeholder="e.g. PM Shri, Goa, Delhi">
-                </div>
-                <div class="config-group">
-                    <label for="manualExtensionInput">Extention (Column B)</label>
-                    <input type="text" id="manualExtensionInput" class="config-input" placeholder="e.g. @pmshri.education.gov.in, @goa.gov.in">
-                </div>
-                <div class="config-group">
-                    <label for="manualUniqueCountInput">Unique Count (Column C)</label>
-                    <input type="number" id="manualUniqueCountInput" class="config-input" placeholder="e.g. 1450" min="0">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" id="cancelManualRecordBtn">Cancel</button>
-                <button class="btn-secondary btn-success" id="saveManualRecordBtn">Add to Ledger</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Create New Week Modal -->
-    <div class="modal-backdrop" id="newWeekModal" style="display: none;">
-        <div class="modal-card modal-card-sm">
-            <div class="modal-header">
-                <div class="modal-title-flex">
-                    <h3>Create New Weekly Tab</h3>
-                </div>
-                <button class="modal-close-btn" id="closeNewWeekModalBtn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="config-group">
-                    <label for="newWeekRangeInput">Week Date Range</label>
-                    <input type="text" id="newWeekRangeInput" class="config-input" placeholder="e.g. 6th Nov - 11th Nov">
-                    <span class="input-hint">Creates a new tab in the ledger for this week's records.</span>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" id="cancelNewWeekBtn">Cancel</button>
-                <button class="btn-secondary btn-success" id="confirmNewWeekBtn">Create Tab</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Toast Notification Container -->
     <div class="toast-container" id="toastContainer"></div>
 
@@ -368,6 +302,6 @@
 
     <!-- SheetJS for multi-sheet Excel (.xlsx) export -->
     <script src="xlsx.full.min.js"></script>
-    <script src="app.js?v=3.0.4"></script>
+    <script src="app.js?v=3.0.5"></script>
 </body>
 </html>
