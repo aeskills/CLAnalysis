@@ -16,7 +16,7 @@ const WEEKLY_STORAGE_KEY = 'dataflow_weekly_school_records_v1';
 const LEGACY_STORAGE_KEY = 'dataflow_school_records_v1';
 
 let weeklyRecords = loadWeeklyRecords();
-let activeWeekRange = getInitialActiveWeek();
+let activeWeekRange = null;
 
 // ==========================================
 // UI Elements
@@ -107,9 +107,11 @@ const toastContainer = document.getElementById('toastContainer');
 // Initialization
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    // If no week range is filled, prefill with default week range
+    activeWeekRange = getInitialActiveWeek();
+
+    // If no week range is filled, prefill with active week or default range
     if (!weekDateRangeInput.value.trim()) {
-        weekDateRangeInput.value = getWeekDateRangeString(0);
+        weekDateRangeInput.value = activeWeekRange;
         clearWeekRangeBtn.style.display = 'block';
     }
 
@@ -165,10 +167,10 @@ function saveWeeklyRecords(data) {
 }
 
 function getInitialActiveWeek() {
-    if (weeklyRecords.length > 0) {
+    if (weeklyRecords && weeklyRecords.length > 0) {
         return weeklyRecords[0].weekRange;
     }
-    return weekDateRangeInput ? weekDateRangeInput.value.trim() : 'Current Week';
+    return getWeekDateRangeString(0);
 }
 
 // ==========================================
