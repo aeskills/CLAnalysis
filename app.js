@@ -39,7 +39,13 @@ const actionItemsContainer = document.getElementById('actionItemsContainer');
 const processBtn = document.getElementById('processBtn');
 const resetBtn = document.getElementById('resetBtn');
 const nextBatchBtn = document.getElementById('nextBatchBtn');
-const downloadBtn = document.getElementById('downloadBtn');
+
+// Unified Download Controls
+const unifiedDownloadBtn = document.getElementById('unifiedDownloadBtn');
+const unifiedDownloadMenu = document.getElementById('unifiedDownloadMenu');
+const btnDownloadCombined = document.getElementById('btnDownloadCombined');
+const btnDownloadSeparate = document.getElementById('btnDownloadSeparate');
+const btnDownloadExcel = document.getElementById('btnDownloadExcel');
 
 // Dashboard Stats
 const statFiles = document.getElementById('statFiles');
@@ -54,12 +60,6 @@ const progressStatusText = document.getElementById('progressStatusText');
 const progressPercentText = document.getElementById('progressPercentText');
 const progressBarFill = document.getElementById('progressBarFill');
 const consolePanel = document.getElementById('consolePanel');
-
-// Current Batch School Breakdown
-const currentBatchCard = document.getElementById('currentBatchCard');
-const currentBatchSubtitle = document.getElementById('currentBatchSubtitle');
-const currentSchoolsGrid = document.getElementById('currentSchoolsGrid');
-const downloadAllCombinedBtn = document.getElementById('downloadAllCombinedBtn');
 
 // Preview Table
 const previewTable = document.getElementById('previewTable');
@@ -79,7 +79,6 @@ const ledgerPlaceholderText = document.getElementById('ledgerPlaceholderText');
 
 const addNewWeekBtn = document.getElementById('addNewWeekBtn');
 const addManualRecordBtn = document.getElementById('addManualRecordBtn');
-const downloadRecordExcelBtn = document.getElementById('downloadRecordExcelBtn');
 const clearWeekRecordsBtn = document.getElementById('clearWeekRecordsBtn');
 const clearAllRecordsBtn = document.getElementById('clearAllRecordsBtn');
 
@@ -567,8 +566,7 @@ processBtn.addEventListener('click', () => {
     
     previewTable.style.display = 'none';
     previewPlaceholder.style.display = 'block';
-    currentBatchCard.style.display = 'none';
-    downloadBtn.disabled = true;
+    unifiedDownloadBtn.disabled = true;
     nextBatchBtn.disabled = true;
 
     if (masterBlobUrl) {
@@ -684,14 +682,13 @@ function finishProcessing(result, weekRange) {
     // Render Preview Table
     renderPreviewTable(result.previewRows);
 
-    // Save current batch schools & render breakdown card
+    // Save current batch schools
     currentBatchSchools = result.schoolsList;
-    renderCurrentSchoolsGrid(result.schoolsList, weekRange);
 
     // Set Master Combined CSV Blob
     const masterBlob = new Blob([result.masterCsvContent], { type: 'text/csv;charset=utf-8;' });
     masterBlobUrl = URL.createObjectURL(masterBlob);
-    downloadBtn.disabled = false;
+    unifiedDownloadBtn.disabled = false;
     nextBatchBtn.disabled = false;
 
     toggleInputs(false);
@@ -734,89 +731,126 @@ function renderPreviewTable(rows) {
 }
 
 // ==========================================
-// Current Batch Schools Breakdown Cards
+// Unified Single Download Controller (Combined, Separate, Excel)
 // ==========================================
-function renderCurrentSchoolsGrid(schools, weekRange) {
-    currentSchoolsGrid.innerHTML = '';
-    if (!schools || schools.length === 0) {
-        currentBatchCard.style.display = 'none';
-        return;
+unifiedDownloadBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (unifiedDownloadBtn.disabled) return;
+    const isVisible = unifiedDownloadMenu.style.display === 'flex';
+    unifiedDownloadMenu.style.display = isVisible ? 'none' : 'flex';
+    unifiedDownloadBtn.classList.toggle('active', !isVisible);
+});
+
+document.addEventListener('click', (e) => {
+    if (!unifiedDownloadBtn.contains(e.target) && !unifiedDownloadMenu.contains(e.target)) {
+        unifiedDownloadMenu.style.display = 'none';
+        unifiedDownloadBtn.classList.remove('active');
     }
+});
 
-    currentBatchCard.style.display = 'block';
-    currentBatchSubtitle.textContent = `Detected ${schools.length} distinct school extension(s) in this week's content dump (${escapeHtml(weekRange)}).`;
-
-    schools.forEach((sch, index) => {
-        const card = document.createElement('div');
-        card.className = 'school-batch-card';
-        card.innerHTML = `
-            <div class="school-batch-header">
-                <div>
-                    <div class="school-batch-name">${escapeHtml(sch.schoolName)}</div>
-                    <div class="school-batch-ext">${escapeHtml(sch.extension)}</div>
-                </div>
-                <div class="school-batch-badge">${sch.uniqueCount.toLocaleString()}</div>
-            </div>
-            <div class="school-batch-footer">
-                <span style="font-size: 0.72rem; color: var(--text-muted);">Unique clean emails</span>
-                <button class="btn-download-school" onclick="downloadCurrentBatchSchoolCsv(${index})" title="Download CSV of clean emails for ${escapeHtml(sch.schoolName)}">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Download CSV
-                </button>
-            </div>
-        `;
-        currentSchoolsGrid.appendChild(card);
-    });
-}
-
-window.downloadCurrentBatchSchoolCsv = function(index) {
-    const sch = currentBatchSchools[index];
-    if (!sch || !sch.csvContent) {
-        showToast('CSV content not available.', 'error');
-        return;
-    }
-    const blob = new Blob([sch.csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const sanitizedName = sch.schoolName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${sanitizedName}_unique_emails.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast(`Downloaded clean emails for "${sch.schoolName}".`, 'success');
-};
-
-downloadAllCombinedBtn.addEventListener('click', () => {
+btnDownloadCombined.addEventListener('click', () => {
+    unifiedDownloadMenu.style.display = 'none';
+    unifiedDownloadBtn.classList.remove('active');
     downloadMasterCsv();
 });
 
-downloadBtn.addEventListener('click', () => {
-    downloadMasterCsv();
+btnDownloadSeparate.addEventListener('click', () => {
+    unifiedDownloadMenu.style.display = 'none';
+    unifiedDownloadBtn.classList.remove('active');
+    downloadAllSeparateCsvs();
+});
+
+btnDownloadExcel.addEventListener('click', () => {
+    unifiedDownloadMenu.style.display = 'none';
+    unifiedDownloadBtn.classList.remove('active');
+    if (typeof XLSX !== 'undefined') {
+        exportMultiSheetExcel();
+    } else {
+        exportFallbackMultiWeekCsv();
+    }
 });
 
 function downloadMasterCsv() {
-    if (!masterBlobUrl) {
-        showToast('No processed data available to download.', 'error');
+    let weekName = activeWeekRange || 'Weekly';
+
+    if (masterBlobUrl) {
+        const sanitizedRange = weekName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const link = document.createElement('a');
+        link.href = masterBlobUrl;
+        link.download = `All_Schools_Clean_Emails_${sanitizedRange}_${dateStr}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        addConsoleLog(`Downloaded combined clean CSV for "${weekName}".`, 'success');
+        showToast(`Downloaded combined CSV for "${weekName}"!`, 'success');
         return;
     }
-    const weekRange = weekDateRangeInput.value.trim() || 'weekly';
-    const sanitizedRange = weekRange.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-    const dateStr = new Date().toISOString().slice(0, 10);
 
+    // On-the-fly generation from active week's schools if masterBlobUrl isn't in memory
+    const activeWeek = weeklyRecords.find(w => activeWeekRange && w.weekRange.toLowerCase() === activeWeekRange.toLowerCase()) || weeklyRecords[0];
+    if (!activeWeek || !activeWeek.schools || activeWeek.schools.length === 0) {
+        showToast('No school records available to download.', 'error');
+        return;
+    }
+
+    let combinedRows = "User Email,School Name,Extension\n";
+    const emailSet = new Set();
+    activeWeek.schools.forEach(sch => {
+        if (sch.csvContent) {
+            const lines = sch.csvContent.split(/\r?\n/).slice(1);
+            lines.forEach(line => {
+                const em = line.trim().replace(/^"|"$/g, '');
+                if (em && !emailSet.has(em)) {
+                    emailSet.add(em);
+                    const escaped = em.includes(',') ? `"${em}"` : em;
+                    const schEscaped = sch.schoolName.includes(',') ? `"${sch.schoolName}"` : sch.schoolName;
+                    combinedRows += `${escaped},${schEscaped},${sch.extension}\n`;
+                }
+            });
+        }
+    });
+
+    const blob = new Blob([combinedRows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const sanitizedRange = weekName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    const dateStr = new Date().toISOString().slice(0, 10);
     const link = document.createElement('a');
-    link.href = masterBlobUrl;
+    link.href = url;
     link.download = `All_Schools_Clean_Emails_${sanitizedRange}_${dateStr}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    addConsoleLog(`Downloaded master combined CSV for week "${weekRange}".`, 'success');
-    showToast(`Downloaded master combined CSV!`, 'success');
+    URL.revokeObjectURL(url);
+    addConsoleLog(`Downloaded combined clean CSV for "${weekName}".`, 'success');
+    showToast(`Downloaded combined CSV for "${weekName}"!`, 'success');
+}
+
+function downloadAllSeparateCsvs() {
+    let activeWeek = weeklyRecords.find(w => activeWeekRange && w.weekRange.toLowerCase() === activeWeekRange.toLowerCase());
+    if (!activeWeek && weeklyRecords.length > 0) activeWeek = weeklyRecords[0];
+
+    if (!activeWeek || !activeWeek.schools || activeWeek.schools.length === 0) {
+        showToast('No schools in current week to download.', 'error');
+        return;
+    }
+
+    let downloadCount = 0;
+    activeWeek.schools.forEach((sch, i) => {
+        if (sch.csvContent) {
+            downloadCount++;
+            setTimeout(() => {
+                window.downloadSchoolCSV(sch.id);
+            }, i * 250);
+        }
+    });
+
+    if (downloadCount > 0) {
+        addConsoleLog(`Triggered separate clean CSV downloads for ${downloadCount} school(s) in week "${activeWeek.weekRange}".`, 'success');
+        showToast(`Downloading ${downloadCount} separate clean CSV files for "${activeWeek.weekRange}"!`, 'success');
+    } else {
+        showToast('No CSV content available for current week schools.', 'info');
+    }
 }
 
 // ==========================================
@@ -931,6 +965,7 @@ function renderWeeklyLedger() {
         ledgerActiveWeekDisplay.textContent = 'No Week Selected';
         ledgerSchoolsCount.textContent = '0';
         ledgerTotalCount.textContent = '0';
+        unifiedDownloadBtn.disabled = true;
         return;
     }
 
@@ -955,9 +990,11 @@ function renderWeeklyLedger() {
         ledgerTable.style.display = 'none';
         ledgerPlaceholder.style.display = 'block';
         ledgerPlaceholderText.textContent = `No schools in "${activeWeek.weekRange}" yet.`;
+        unifiedDownloadBtn.disabled = true;
         return;
     }
 
+    unifiedDownloadBtn.disabled = false;
     ledgerPlaceholder.style.display = 'none';
     ledgerTable.style.display = 'table';
 
@@ -1123,10 +1160,6 @@ nextBatchBtn.addEventListener('click', () => {
     renderFileList();
     updateUploadStats();
 
-    currentBatchSchools = [];
-    currentBatchCard.style.display = 'none';
-    currentSchoolsGrid.innerHTML = '';
-
     previewTableBody.innerHTML = '';
     previewTable.style.display = 'none';
     previewPlaceholder.style.display = 'block';
@@ -1139,7 +1172,6 @@ nextBatchBtn.addEventListener('click', () => {
         URL.revokeObjectURL(masterBlobUrl);
         masterBlobUrl = null;
     }
-    downloadBtn.disabled = true;
     nextBatchBtn.disabled = true;
 
     // Advance week date range input if currently matches this week
@@ -1158,10 +1190,6 @@ resetBtn.addEventListener('click', () => {
         renderFileList();
         updateUploadStats();
 
-        currentBatchSchools = [];
-        currentBatchCard.style.display = 'none';
-        currentSchoolsGrid.innerHTML = '';
-
         previewTableBody.innerHTML = '';
         previewTable.style.display = 'none';
         previewPlaceholder.style.display = 'block';
@@ -1178,38 +1206,8 @@ resetBtn.addEventListener('click', () => {
             URL.revokeObjectURL(masterBlobUrl);
             masterBlobUrl = null;
         }
-        downloadBtn.disabled = true;
         nextBatchBtn.disabled = true;
         showToast('Dashboard reset.', 'info');
-    }
-});
-
-// ==========================================
-// Multi-Tab Excel Export (SheetJS / XLSX)
-// Column A: School Name | Column B: Extention | Column C: Unique Count
-// Each week is exported as its own separate sheet tab!
-// ==========================================
-downloadRecordExcelBtn.addEventListener('click', () => {
-    if (weeklyRecords.length === 0) {
-        showToast('No weekly school records in ledger to export.', 'error');
-        return;
-    }
-
-    let totalSchoolsAcrossAllWeeks = 0;
-    weeklyRecords.forEach(w => {
-        totalSchoolsAcrossAllWeeks += (w.schools ? w.schools.length : 0);
-    });
-
-    if (totalSchoolsAcrossAllWeeks === 0) {
-        showToast('All weekly tabs are empty. Upload files or add school records first.', 'error');
-        return;
-    }
-
-    if (typeof XLSX !== 'undefined') {
-        exportMultiSheetExcel();
-    } else {
-        // Fallback to CSV if SheetJS is somehow unavailable
-        exportFallbackMultiWeekCsv();
     }
 });
 

@@ -165,94 +165,7 @@
                 </div>
             </div>
 
-            <!-- Current Batch School Breakdown Card -->
-            <div class="glass-card current-batch-card" id="currentBatchCard" style="display: none;">
-                <div class="card-header-flex">
-                    <div>
-                        <h2 class="card-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                            </svg>
-                            Current Batch: Schools &amp; Extensions Detected
-                        </h2>
-                        <p class="card-subtitle" id="currentBatchSubtitle">Unique emails isolated separately for each school based on email extension.</p>
-                    </div>
-                    <div class="ledger-header-actions">
-                        <button class="btn-secondary btn-sm" id="downloadAllCombinedBtn" title="Download combined CSV containing all schools">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                            Download All Combined CSV
-                        </button>
-                    </div>
-                </div>
-
-                <div class="schools-grid" id="currentSchoolsGrid">
-                    <!-- Populated dynamically with school cards -->
-                </div>
-            </div>
-
-            <!-- Table Preview (First 100 rows) -->
-            <div class="glass-card">
-                <h2 class="card-title">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                        <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
-                    Clean Email Data Preview (First 100 rows)
-                </h2>
-                
-                <div class="table-container">
-                    <table class="preview-table" id="previewTable" style="display: none;">
-                        <thead>
-                            <tr>
-                                <th style="width: 60px;">#</th>
-                                <th>User Email</th>
-                                <th>School Name</th>
-                                <th>Extension</th>
-                            </tr>
-                        </thead>
-                        <tbody id="previewTableBody">
-                            <!-- Populated dynamically -->
-                        </tbody>
-                    </table>
-                    
-                    <div class="preview-placeholder" id="previewPlaceholder">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="9" y1="9" x2="15" y2="15"></line>
-                            <line x1="15" y1="9" x2="9" y2="15"></line>
-                        </svg>
-                        <p>No preview available. Process files to view filtered results.</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Download & Batch Reset Actions -->
-            <div class="download-section">
-                <button class="btn-secondary" id="resetBtn">Reset</button>
-                <button class="btn-secondary btn-action-next" id="nextBatchBtn" disabled title="Clear upload zone for the next week while keeping all records in weekly tabs">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                    Next Week Batch
-                </button>
-                <button class="btn-secondary btn-success" id="downloadBtn" disabled>
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    Download Master CSV
-                </button>
-            </div>
-
-            <!-- Weekly School Records Summary Ledger Card -->
+            <!-- Unified Weekly School Records Summary Ledger Card (One Section) -->
             <div class="glass-card ledger-card" id="ledgerCard">
                 <div class="card-header-flex">
                     <div>
@@ -264,7 +177,7 @@
                             </svg>
                             Weekly School Records Summary Ledger
                         </h2>
-                        <p class="card-subtitle">Weekly tabs with school records: Column A (School Name), Column B (Extention), Column C (Unique Count). Multi-tab Excel export supported.</p>
+                        <p class="card-subtitle">Weekly tabs with school records: Column A (School Name), Column B (Extention), Column C (Unique Count). Multi-tab Excel export & clean CSV downloads supported.</p>
                     </div>
                     <div class="ledger-header-actions">
                         <button class="btn-secondary btn-sm" id="addNewWeekBtn" title="Create a new weekly tab">
@@ -275,12 +188,45 @@
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                             Add School Row
                         </button>
-                        <button class="btn-excel" id="downloadRecordExcelBtn" title="Download Excel Workbook (Each week as a separate tab: Column A: School Name, Column B: Extention, Column C: Unique Count)">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm2 14-2.5-3 2.5-3h-2l-1.5 2-1.5-2h-2l2.5 3-2.5 3h2l1.5-2 1.5 2h2zM13 9V3.5L18.5 9H13z"/>
-                            </svg>
-                            Download Record (Excel)
-                        </button>
+                        
+                        <!-- Unified Single Download Button (Combined, Different / Separate, Excel) -->
+                        <div class="unified-download-group">
+                            <button type="button" class="btn-unified-download" id="unifiedDownloadBtn" disabled title="Download Options">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                <span>Download Clean Data</span>
+                                <svg class="dropdown-arrow" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </button>
+                            <div class="unified-download-menu" id="unifiedDownloadMenu" style="display: none;">
+                                <button type="button" class="download-menu-item" id="btnDownloadCombined">
+                                    <div class="menu-item-icon">📦</div>
+                                    <div class="menu-item-text">
+                                        <span class="menu-item-title">Download Combined CSV</span>
+                                        <span class="menu-item-desc">All schools combined into 1 clean CSV file</span>
+                                    </div>
+                                </button>
+                                <button type="button" class="download-menu-item" id="btnDownloadSeparate">
+                                    <div class="menu-item-icon">📁</div>
+                                    <div class="menu-item-text">
+                                        <span class="menu-item-title">Download Separate CSVs</span>
+                                        <span class="menu-item-desc">Downloads individual clean CSV files for each school</span>
+                                    </div>
+                                </button>
+                                <div class="dropdown-divider"></div>
+                                <button type="button" class="download-menu-item" id="btnDownloadExcel">
+                                    <div class="menu-item-icon">📊</div>
+                                    <div class="menu-item-text">
+                                        <span class="menu-item-title">Download Record (Excel)</span>
+                                        <span class="menu-item-desc">Multi-tab workbook: Column A (School), Column B (Extention), Column C (Unique Count)</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -339,6 +285,56 @@
                         <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Upload content logs with a week date range (e.g. 31st Oct - 5th Nov) to automatically build the weekly record ledger.</span>
                     </div>
                 </div>
+            </div>
+
+            <!-- Table Preview (First 100 rows) -->
+            <div class="glass-card" style="margin-top: 1.5rem;">
+                <h2 class="card-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    Clean Email Data Preview (First 100 rows)
+                </h2>
+                
+                <div class="table-container">
+                    <table class="preview-table" id="previewTable" style="display: none;">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">#</th>
+                                <th>User Email</th>
+                                <th>School Name</th>
+                                <th>Extension</th>
+                            </tr>
+                        </thead>
+                        <tbody id="previewTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                    
+                    <div class="preview-placeholder" id="previewPlaceholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                        </svg>
+                        <p>No preview available. Process files to view filtered results.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Download & Batch Reset Actions -->
+            <div class="download-section">
+                <button class="btn-secondary" id="resetBtn">Reset</button>
+                <button class="btn-secondary btn-action-next" id="nextBatchBtn" disabled title="Clear upload zone for the next week while keeping all records in weekly tabs">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                    Next Week Batch
+                </button>
             </div>
         </section>
     </main>
@@ -411,6 +407,6 @@
 
     <!-- SheetJS for multi-sheet Excel (.xlsx) export -->
     <script src="xlsx.full.min.js"></script>
-    <script src="app.js?v=3.0.1"></script>
+    <script src="app.js?v=3.0.2"></script>
 </body>
 </html>
