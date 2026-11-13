@@ -120,13 +120,14 @@ main {
     margin: 2rem auto;
     padding: 0 2rem;
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2rem;
+    min-width: 0;
 }
 
 @media (min-width: 1024px) {
     main {
-        grid-template-columns: 350px 1fr;
+        grid-template-columns: 350px minmax(0, 1fr);
     }
 }
 
@@ -383,6 +384,8 @@ main {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    min-width: 0;
+    max-width: 100%;
 }
 
 /* Statistics Grid */
@@ -1310,26 +1313,47 @@ footer {
 .week-tabs-container {
     margin-bottom: 1rem;
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 0.25rem;
+    padding-bottom: 0.5rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    position: relative;
 }
 
 .week-tabs-bar {
     display: flex;
     flex-wrap: nowrap;
     overflow-x: auto;
-    gap: 0.4rem;
-    padding-bottom: 0.4rem;
+    overflow-y: hidden;
+    gap: 0.5rem;
+    padding-bottom: 0.65rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    scrollbar-color: rgba(99, 102, 241, 0.7) rgba(255, 255, 255, 0.06);
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
 }
 
 .week-tabs-bar::-webkit-scrollbar {
-    height: 4px;
+    height: 7px;
+}
+
+.week-tabs-bar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 9999px;
+    margin: 0 2px;
 }
 
 .week-tabs-bar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
+    background: linear-gradient(90deg, #6366f1, #818cf8);
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.week-tabs-bar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, #4f46e5, #6366f1);
 }
 
 .week-tab-btn {
@@ -1346,6 +1370,7 @@ footer {
     align-items: center;
     gap: 0.5rem;
     white-space: nowrap;
+    flex-shrink: 0;
     transition: all 0.15s ease;
     border-bottom: 2px solid transparent;
 }
@@ -1426,6 +1451,9 @@ footer {
 .ledger-card {
     border-color: rgba(99, 102, 241, 0.2);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    min-width: 0;
+    max-width: 100%;
+    position: relative;
 }
 
 .card-header-flex {
@@ -1433,6 +1461,7 @@ footer {
     flex-direction: column;
     gap: 1rem;
     margin-bottom: 1.25rem;
+    min-width: 0;
 }
 
 @media (min-width: 768px) {
@@ -1441,6 +1470,11 @@ footer {
         justify-content: space-between;
         align-items: flex-start;
     }
+}
+
+.card-header-flex > div:first-child {
+    min-width: 0;
+    flex: 1;
 }
 
 .card-subtitle {
@@ -1454,6 +1488,7 @@ footer {
     flex-wrap: wrap;
     gap: 0.6rem;
     align-items: center;
+    flex-shrink: 0;
 }
 
 /* Unified Download Split / Dropdown Button */

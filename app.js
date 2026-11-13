@@ -1273,7 +1273,23 @@ function renderWeeklyTabs() {
         });
 
         weekTabsBar.appendChild(tabBtn);
+
+        if (isActive) {
+            requestAnimationFrame(() => {
+                tabBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+            });
+        }
     });
+}
+
+// Enable horizontal scrolling with mouse wheel on week tabs bar
+if (weekTabsBar) {
+    weekTabsBar.addEventListener('wheel', (e) => {
+        if (e.deltaY !== 0) {
+            e.preventDefault();
+            weekTabsBar.scrollLeft += e.deltaY;
+        }
+    }, { passive: false });
 }
 
 window.removeWeekTab = function(weekRangeName, event) {
