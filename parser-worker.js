@@ -1,8 +1,8 @@
-// Web Worker for multi-school content dump processing
-// Extracts schools and extensions from email domains and calculates unique counts per school
+// Web Worker for CSV dataflow admin console processing (June 4 Baseline)
+// High-performance line-by-line streaming parser with Chunked File Streaming
 
 self.onmessage = async function(e) {
-    const { files, emailColConfig, actionColConfig, actionValuesRaw, customOrgExtensions } = e.data;
+    const { files, emailColConfig, actionColConfig, actionValuesRaw } = e.data;
     
     // Parse action values list (e.g. "Read, Create, Create with public Link")
     const actionFilters = actionValuesRaw
@@ -11,7 +11,7 @@ self.onmessage = async function(e) {
         .filter(v => v.length > 0);
 
     try {
-        const result = await processCSVFiles(files, emailColConfig, actionColConfig, actionFilters, customOrgExtensions);
+        const result = await processCSVFiles(files, emailColConfig, actionColConfig, actionFilters);
         self.postMessage({ type: 'COMPLETE', data: result });
     } catch (err) {
         self.postMessage({ type: 'ERROR', message: err.message });
@@ -44,6 +44,9 @@ function parseCSVLine(text) {
     return fields;
 }
 
+/* =========================================================================
+   NEW LEVEL UPGRADE: OFFICIAL SCHOOL EXTENSIONS & EXTRACTION (COMMENTED OUT)
+   =========================================================================
 // Official School Email Extensions Mapping from Org_Email_Extensions_Complete.xlsx
 const DEFAULT_OFFICIAL_ORG_EXTENSIONS = {
     "u1.kgbvup.in": "KGBV 2",
@@ -76,8 +79,6 @@ const DEFAULT_OFFICIAL_ORG_EXTENSIONS = {
 };
 
 // Domain to School Name Extraction Engine
-// 1. Matches against Org_Email_Extensions_Complete.xlsx official mappings
-// 2. Fallback: Intelligent heuristic extraction from the @ of the email
 function extractSchoolInfoFromEmail(email, orgExtensionsMap = DEFAULT_OFFICIAL_ORG_EXTENSIONS) {
     if (!email) return null;
     const atIdx = email.lastIndexOf('@');
@@ -91,14 +92,11 @@ function extractSchoolInfoFromEmail(email, orgExtensionsMap = DEFAULT_OFFICIAL_O
 
     const extLookup = orgExtensionsMap || DEFAULT_OFFICIAL_ORG_EXTENSIONS;
 
-    // 1. Exact match in official extensions (e.g. u1.kgbvup.in -> KGBV 2)
     if (extLookup && extLookup[domain]) {
         schoolName = extLookup[domain];
         return { domain, extension, schoolName, isOfficial: true };
     }
 
-    // 2. Subdomain match (e.g. student.u1.kgbvup.in -> u1.kgbvup.in -> KGBV 2)
-    // Keys sorted descending by length to respect whole domain specificity
     if (extLookup) {
         const sortedKeys = Object.keys(extLookup).sort((a, b) => b.length - a.length);
         for (const key of sortedKeys) {
@@ -109,8 +107,6 @@ function extractSchoolInfoFromEmail(email, orgExtensionsMap = DEFAULT_OFFICIAL_O
         }
     }
 
-    // 3. Fallback extraction: domain does not belong to Org_Email_Extensions_Complete.xlsx
-    // Extracts clean, readable name from the @ of the email
     if (domain.includes('pmshri')) {
         schoolName = 'PM Shri';
     } else if (domain.includes('goa')) {
@@ -148,15 +144,11 @@ function extractSchoolInfoFromEmail(email, orgExtensionsMap = DEFAULT_OFFICIAL_O
     } else if (domain.includes('mp.gov') || domain.includes('madhyapradesh')) {
         schoolName = 'Madhya Pradesh';
     } else {
-        // Fallback clean extraction
-        // Strip common TLDs: .gov.in, .nic.in, .edu.in, .ac.in, .org.in, .co.in, .com, .edu, .org, .net, etc.
         let cleaned = domain
             .replace(/\.(gov|nic|edu|ac|org|co|res)\.in$/i, '')
             .replace(/\.(in|com|org|net|edu|gov|io|ai)$/i, '');
-        // Take the main subdomain or domain name
         const parts = cleaned.split('.').filter(p => p.length > 0);
         const mainPart = parts.length > 0 ? parts[parts.length - 1] : cleaned;
-        // Convert hyphens/underscores to spaces and capitalize
         schoolName = mainPart
             .split(/[-_]/)
             .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -171,8 +163,9 @@ function extractSchoolInfoFromEmail(email, orgExtensionsMap = DEFAULT_OFFICIAL_O
         isOfficial: false
     };
 }
+========================================================================= */
 
-async function processCSVFiles(files, emailColConfig, actionColConfig, actionFilters, customOrgExtensions) {
+async function processCSVFiles(files, emailColConfig, actionColConfig, actionFilters) {
     let globalLog = [];
     function log(message, logLevel = 'info') {
         const timestamp = new Date().toLocaleTimeString();
@@ -180,101 +173,84 @@ async function processCSVFiles(files, emailColConfig, actionColConfig, actionFil
         self.postMessage({ type: 'LOG', timestamp, message, logLevel });
     }
 
-    const activeOrgExtensions = customOrgExtensions || DEFAULT_OFFICIAL_ORG_EXTENSIONS;
-    const mappingCount = Object.keys(activeOrgExtensions).length;
-
-    log(`Starting multi-school processing of ${files.length} file(s)...`, 'info');
-    log(`Active dictionary: ${mappingCount} official school extension mappings loaded from Org_Email_Extensions_Complete.xlsx`, 'info');
+    log(`Starting pipeline processing of ${files.length} file(s)...`, 'info');
 
     let totalRawRecords = 0;
     let totalMatchingActions = 0;
     let totalAdobeExcluded = 0;
     
-    // Grouping by school extension: extension -> { schoolName, extension, emailsSet: Set() }
-    const schoolGroups = new Map();
-    // Master deduplication set across all schools
-    const masterEmailSet = new Set();
-    const masterEmailList = [];
+    // Master collection of records to be deduplicated: array of { email, originFile }
+    const masterEmails = [];
     
     // Column indices (detected or mapped)
     let emailColIdx = -1;
     let actionColIdx = -1;
-    let headersDetected = false;
     let headersList = [];
 
-    // Helper: read a chunk as text from file
-    function readBlobAsText(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => reject(reader.error);
-            reader.readAsText(blob);
-        });
-    }
+    // Helper reader to read chunks as text
+    const decoder = new TextDecoder("utf-8");
 
-    for (let fileIdx = 0; fileIdx < files.length; fileIdx++) {
-        const file = files[fileIdx];
-        log(`Reading File ${fileIdx + 1}/${files.length}: "${file.name}" (${(file.size / (1024 * 1024)).toFixed(2)} MB)...`, 'info');
+    // Process each file sequentially
+    for (let fIdx = 0; fIdx < files.length; fIdx++) {
+        const file = files[fIdx];
+        log(`Reading and processing file [${fIdx + 1}/${files.length}]: "${file.name}" (${(file.size / 1024 / 1024).toFixed(2)} MB)...`, 'info');
 
-        const chunkSize = 10 * 1024 * 1024; // 10MB chunks
+        const chunkSize = 4 * 1024 * 1024; // 4MB chunks
         let offset = 0;
         let remainder = "";
-        let isFirstChunk = true;
+        let isFirstLine = true;
         let fileRawRecords = 0;
+        let fileFilteredCount = 0;
+
+        // Set to track unique emails within this individual file
+        const fileEmailsSet = new Set();
 
         while (offset < file.size) {
             const slice = file.slice(offset, offset + chunkSize);
-            const textChunk = await readBlobAsText(slice);
+            const buffer = await slice.arrayBuffer();
+            const textChunk = decoder.decode(buffer, { stream: offset + chunkSize < file.size });
             offset += chunkSize;
 
-            // Combine with remainder from previous chunk
-            const text = remainder + textChunk;
-            const lines = text.split(/\r?\n/);
+            const fullText = remainder + textChunk;
+            const lines = fullText.split(/\r?\n/);
             
-            // The last item in lines is either empty or an incomplete line
+            // The last item might be incomplete; save it for the next chunk
             remainder = lines.pop();
 
-            let startIdx = 0;
-            if (isFirstChunk && fileIdx === 0) {
-                // If it is the very first chunk of the first file, parse headers
-                const headerLine = lines[0];
-                if (headerLine) {
-                    headersList = parseCSVLine(headerLine);
-                    log(`Detected CSV headers: ${headersList.join(', ')}`, 'info');
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (!line.trim()) continue;
+
+                if (isFirstLine) {
+                    isFirstLine = false;
+                    headersList = parseCSVLine(line);
                     
+                    // Detect column indices based on user config or auto-discovery
                     emailColIdx = detectEmailColumn(headersList, emailColConfig);
                     actionColIdx = detectActionColumn(headersList, actionColConfig);
 
-                    log(`Mapping email column to: ${emailColIdx !== -1 ? `Index ${emailColIdx} ("${headersList[emailColIdx]}")` : 'Index 3 (User Email)'}`, 'info');
-                    log(`Mapping action column to: ${actionColIdx !== -1 ? `Index ${actionColIdx} ("${headersList[actionColIdx]}")` : 'Auto scan'}`, 'info');
-                    
-                    headersDetected = true;
-                    startIdx = 1;
+                    log(`File headers parsed: Email column index = ${emailColIdx} ("${headersList[emailColIdx] || 'default'}"), Action column index = ${actionColIdx} ("${headersList[actionColIdx] || 'search across'}")`, 'info');
+                    continue; // Skip header row from data processing
                 }
-                isFirstChunk = false;
-            } else if (isFirstChunk && fileIdx > 0) {
-                startIdx = 1; // Skip header line for subsequent files
-                isFirstChunk = false;
-            }
 
-            for (let i = startIdx; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-
-                fileRawRecords++;
                 totalRawRecords++;
-                
+                fileRawRecords++;
+
                 const fields = parseCSVLine(line);
+                
+                // If column indices weren't found, perform simple fallback (Column D / Index 3 for email)
                 const currentEmailIdx = emailColIdx !== -1 ? emailColIdx : 3;
                 const currentActionIdx = actionColIdx !== -1 ? actionColIdx : -1;
                 
                 const email = fields[currentEmailIdx] ? fields[currentEmailIdx].trim() : '';
                 
+                // Check action filter using EXACT case-insensitive match
                 let actionMatch = false;
                 if (currentActionIdx !== -1 && fields[currentActionIdx]) {
                     const actionVal = fields[currentActionIdx].trim().toLowerCase();
                     actionMatch = actionFilters.some(filter => actionVal === filter);
                 } else {
+                    // Fallback: search across all fields if action column is not defined
                     for (let f = 0; f < fields.length; f++) {
                         if (f === currentEmailIdx) continue;
                         const val = fields[f].trim().toLowerCase();
@@ -292,27 +268,11 @@ async function processCSVFiles(files, emailColConfig, actionColConfig, actionFil
                         if (email.toLowerCase().includes('@adobe.com')) {
                             totalAdobeExcluded++;
                         } else {
+                            // Valid non-adobe email matching filter
                             const lowerEmail = email.toLowerCase();
-                            const schoolInfo = extractSchoolInfoFromEmail(lowerEmail, activeOrgExtensions);
-                            
-                            if (schoolInfo) {
-                                if (!schoolGroups.has(schoolInfo.extension)) {
-                                    schoolGroups.set(schoolInfo.extension, {
-                                        schoolName: schoolInfo.schoolName,
-                                        extension: schoolInfo.extension,
-                                        emailsSet: new Set()
-                                    });
-                                }
-                                schoolGroups.get(schoolInfo.extension).emailsSet.add(lowerEmail);
-                            }
-                            
-                            if (!masterEmailSet.has(lowerEmail)) {
-                                masterEmailSet.add(lowerEmail);
-                                masterEmailList.push({
-                                    email: lowerEmail,
-                                    schoolName: schoolInfo ? schoolInfo.schoolName : 'Unknown',
-                                    extension: schoolInfo ? schoolInfo.extension : ''
-                                });
+                            if (!fileEmailsSet.has(lowerEmail)) {
+                                fileEmailsSet.add(lowerEmail);
+                                fileFilteredCount++;
                             }
                         }
                     }
@@ -328,8 +288,7 @@ async function processCSVFiles(files, emailColConfig, actionColConfig, actionFil
                 rawRecords: totalRawRecords,
                 matchingActions: totalMatchingActions,
                 adobeExcluded: totalAdobeExcluded,
-                cleanEmails: masterEmailSet.size,
-                schoolsDetected: schoolGroups.size
+                cleanEmails: masterEmails.length + fileEmailsSet.size
             });
         }
 
@@ -362,90 +321,92 @@ async function processCSVFiles(files, emailColConfig, actionColConfig, actionFil
                         totalAdobeExcluded++;
                     } else {
                         const lowerEmail = email.toLowerCase();
-                        const schoolInfo = extractSchoolInfoFromEmail(lowerEmail, activeOrgExtensions);
-                        
-                        if (schoolInfo) {
-                            if (!schoolGroups.has(schoolInfo.extension)) {
-                                schoolGroups.set(schoolInfo.extension, {
-                                    schoolName: schoolInfo.schoolName,
-                                    extension: schoolInfo.extension,
-                                    emailsSet: new Set()
-                                });
-                            }
-                            schoolGroups.get(schoolInfo.extension).emailsSet.add(lowerEmail);
-                        }
-                        
-                        if (!masterEmailSet.has(lowerEmail)) {
-                            masterEmailSet.add(lowerEmail);
-                            masterEmailList.push({
-                                email: lowerEmail,
-                                schoolName: schoolInfo ? schoolInfo.schoolName : 'Unknown',
-                                extension: schoolInfo ? schoolInfo.extension : ''
-                            });
+                        if (!fileEmailsSet.has(lowerEmail)) {
+                            fileEmailsSet.add(lowerEmail);
+                            fileFilteredCount++;
                         }
                     }
                 }
             }
         }
 
-        log(`Finished file "${file.name}". Current unique email pool: ${masterEmailSet.size} across ${schoolGroups.size} school extension(s).`, 'success');
-    }
-
-    log(`All files parsed. Compiling per-school breakdown and unique email records...`, 'info');
-
-    // Build schools list
-    const schoolsList = [];
-    for (const [extension, group] of schoolGroups.entries()) {
-        const emailsArr = Array.from(group.emailsSet);
+        // We finished the file. Let's record the row indices and append unique emails from this file
+        const startRowIdx = masterEmails.length + 1;
+        const fileEmailsArr = Array.from(fileEmailsSet);
         
-        // Build clean CSV string for this school
-        let schoolCsv = "User Email\n";
-        for (const em of emailsArr) {
-            const escaped = em.includes(',') ? `"${em}"` : em;
-            schoolCsv += `${escaped}\n`;
+        for (const email of fileEmailsArr) {
+            masterEmails.push({
+                email: email,
+                originFile: file.name
+            });
         }
-
-        schoolsList.push({
-            schoolName: group.schoolName,
-            extension: group.extension,
-            uniqueCount: emailsArr.length,
-            csvContent: schoolCsv,
-            sampleEmails: emailsArr.slice(0, 10)
-        });
+        
+        const endRowIdx = masterEmails.length;
+        
+        log(`Finished file "${file.name}". Contributed unique records to new CSV row indices: [${startRowIdx} - ${endRowIdx}] (Count: ${fileEmailsArr.length})`, 'success');
     }
 
-    // Sort schools alphabetically
-    schoolsList.sort((a, b) => a.schoolName.localeCompare(b.schoolName));
+    // Now perform final deduplication on the combined master list
+    log('Processing completed for all files. Running final cross-file deduplication on User Email (Column A)...', 'info');
+    
+    const finalCleanEmails = [];
+    const finalCleanSet = new Set();
+    let crossFileDuplicatesCount = 0;
 
-    log(`Extraction complete: Detected ${schoolsList.length} school(s) with ${masterEmailSet.size} total unique emails.`, 'success');
-    for (const sch of schoolsList) {
-        log(`  • ${sch.schoolName} (${sch.extension}): ${sch.uniqueCount.toLocaleString()} unique emails`, 'info');
+    for (const record of masterEmails) {
+        const emailLower = record.email.toLowerCase();
+        if (!finalCleanSet.has(emailLower)) {
+            finalCleanSet.add(emailLower);
+            finalCleanEmails.push(record);
+        } else {
+            crossFileDuplicatesCount++;
+        }
     }
 
-    // Build Master Combined CSV
-    let masterCsv = "User Email,School Name,Extension\n";
-    for (const rec of masterEmailList) {
-        const escapedEmail = rec.email.includes(',') ? `"${rec.email}"` : rec.email;
-        const escapedSchool = rec.schoolName.includes(',') ? `"${rec.schoolName}"` : rec.schoolName;
-        masterCsv += `${escapedEmail},${escapedSchool},${rec.extension}\n`;
+    log(`Final cross-file deduplication removed ${crossFileDuplicatesCount} duplicate email(s).`, 'success');
+    log(`Master list contains ${finalCleanEmails.length} unique emails.`, 'success');
+
+    // Create the clean CSV content
+    // Header: User Email
+    let csvContent = "User Email\n";
+    for (const record of finalCleanEmails) {
+        // Simple escaping just in case
+        const escapedEmail = record.email.includes(',') ? `"${record.email}"` : record.email;
+        csvContent += `${escapedEmail}\n`;
     }
+
+    /* =========================================================================
+       NEW LEVEL UPGRADE: MULTI-SCHOOL LIST RETURN FORMAT (COMMENTED OUT)
+       =========================================================================
+    // Build Master Combined CSV & Schools List
+    // let masterCsv = "User Email,School Name,Extension\n";
+    // for (const rec of masterEmailList) {
+    //     masterCsv += `${rec.email},${rec.schoolName},${rec.extension}\n`;
+    // }
+    // return {
+    //     schoolsList,
+    //     masterCsvContent: masterCsv,
+    //     stats: { totalRawRecords, totalMatchingActions, totalAdobeExcluded, finalCleanCount: masterEmailSet.size, schoolsCount: schoolsList.length, filesProcessed: files.length },
+    //     previewRows: masterEmailList.slice(0, 100),
+    //     logs: globalLog
+    // };
+    ========================================================================= */
 
     return {
-        schoolsList,
-        masterCsvContent: masterCsv,
+        csvContent,
         stats: {
             totalRawRecords,
             totalMatchingActions,
             totalAdobeExcluded,
-            finalCleanCount: masterEmailSet.size,
-            schoolsCount: schoolsList.length,
+            finalCleanCount: finalCleanEmails.length,
             filesProcessed: files.length
         },
-        previewRows: masterEmailList.slice(0, 100),
-        logs: globalLog
+        previewRows: finalCleanEmails.slice(0, 100),
+        headersList
     };
 }
 
+// Helpers for detecting columns
 function detectEmailColumn(headers, configValue) {
     if (configValue !== 'auto') {
         const idx = headers.indexOf(configValue);
@@ -454,6 +415,7 @@ function detectEmailColumn(headers, configValue) {
         if (!isNaN(idxNum) && idxNum >= 0 && idxNum < headers.length) return idxNum;
     }
     
+    // Look for exact "user email" or "email"
     for (let i = 0; i < headers.length; i++) {
         const header = headers[i].toLowerCase().trim();
         if (header === 'user email' || header === 'email' || header === 'user_email') {
@@ -461,6 +423,7 @@ function detectEmailColumn(headers, configValue) {
         }
     }
     
+    // Look for match containing email
     for (let i = 0; i < headers.length; i++) {
         const header = headers[i].toLowerCase();
         if (header.includes('email') || header.includes('mail')) {
@@ -468,7 +431,8 @@ function detectEmailColumn(headers, configValue) {
         }
     }
 
-    return 3; // Default to Column D (index 3)
+    // Default to Column D (index 3)
+    return 3;
 }
 
 function detectActionColumn(headers, configValue) {
@@ -506,5 +470,5 @@ function detectActionColumn(headers, configValue) {
         }
     }
 
-    return -1;
+    return -1; // Worker will search all columns if not found
 }

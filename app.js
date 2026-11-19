@@ -1,50 +1,21 @@
 // Application Coordinator for CSV Dataflow Admin Console Processor
-// v3.0.0 - Multi-School Weekly Processor & Multi-Tab Excel Summary Ledger
-// Supports multi-school content dumps, domain-based school name & extension extraction,
-// weekly tabs system, per-school clean downloads, and multi-tab SheetJS Excel export.
+// Restored to June 4 Baseline: Content Log Analysis CSV Processor
+// Note: All New Level Upgrades are preserved as commented-out code below.
 
 // ==========================================
-// Application State
+// Application State (June 4 Baseline)
 // ==========================================
 let uploadedFiles = [];
 let worker = null;
-let masterBlobUrl = null;
-let currentBatchSchools = []; // Schools detected in current batch
+let processedBlobUrl = null;
 let detectedActions = []; // Dynamically detected action values from CSV
-let loadedOrgExtensions = null; // Official school email extensions loaded from Org_Email_Extensions_Complete.xlsx
-
-const WEEKLY_STORAGE_KEY = 'dataflow_weekly_school_records_v1';
-const LEGACY_STORAGE_KEY = 'dataflow_school_records_v1';
-
-let weeklyRecords = loadWeeklyRecords();
-let activeWeekRange = null;
 
 // ==========================================
-// UI Elements
+// UI Elements (June 4 Baseline)
 // ==========================================
-// Sidebar Upload & Mapping
 const uploadZone = document.getElementById('uploadZone');
 const fileInput = document.getElementById('fileInput');
 const fileList = document.getElementById('fileList');
-
-const weekDateRangeInput = document.getElementById('weekDateRangeInput');
-const clearWeekRangeBtn = document.getElementById('clearWeekRangeBtn');
-const btnPresetThisWeek = document.getElementById('btnPresetThisWeek');
-const btnPresetLastWeek = document.getElementById('btnPresetLastWeek');
-
-// Calendar Picker Elements
-const calendarToggleBtn = document.getElementById('calendarToggleBtn');
-const calendarDropdown = document.getElementById('calendarDropdown');
-const calMonthTitle = document.getElementById('calMonthTitle');
-const calPrevMonth = document.getElementById('calPrevMonth');
-const calNextMonth = document.getElementById('calNextMonth');
-const calDaysGrid = document.getElementById('calDaysGrid');
-const calModeWeek = document.getElementById('calModeWeek');
-const calModeCustom = document.getElementById('calModeCustom');
-const calPresetThisWeek = document.getElementById('calPresetThisWeek');
-const calPresetLastWeek = document.getElementById('calPresetLastWeek');
-const calCloseBtn = document.getElementById('calCloseBtn');
-
 const dropdownTrigger = document.getElementById('dropdownTrigger');
 const dropdownMenu = document.getElementById('dropdownMenu');
 const selectedActionsText = document.getElementById('selectedActionsText');
@@ -52,670 +23,24 @@ const selectAllCheckbox = document.getElementById('selectAllCheckbox');
 const actionItemsContainer = document.getElementById('actionItemsContainer');
 const processBtn = document.getElementById('processBtn');
 const resetBtn = document.getElementById('resetBtn');
-const nextBatchBtn = document.getElementById('nextBatchBtn');
+const downloadBtn = document.getElementById('downloadBtn');
 
-// Unified Download Controls
-const unifiedDownloadBtn = document.getElementById('unifiedDownloadBtn');
-const unifiedDownloadMenu = document.getElementById('unifiedDownloadMenu');
-const btnDownloadCombined = document.getElementById('btnDownloadCombined');
-const btnDownloadSeparate = document.getElementById('btnDownloadSeparate');
-const btnDownloadExcel = document.getElementById('btnDownloadExcel');
-
-// Dashboard Stats
 const statFiles = document.getElementById('statFiles');
 const statProcessed = document.getElementById('statProcessed');
 const statFiltered = document.getElementById('statFiltered');
 const statClean = document.getElementById('statClean');
-const statSchools = document.getElementById('statSchools');
 
-// Progress & Console
 const progressBanner = document.getElementById('progressBanner');
 const progressStatusText = document.getElementById('progressStatusText');
 const progressPercentText = document.getElementById('progressPercentText');
 const progressBarFill = document.getElementById('progressBarFill');
+
 const consolePanel = document.getElementById('consolePanel');
-
-
-// Weekly School Records Ledger
-const ledgerCard = document.getElementById('ledgerCard');
-const weekTabsBar = document.getElementById('weekTabsBar');
-const ledgerActiveWeekDisplay = document.getElementById('ledgerActiveWeekDisplay');
-const ledgerSchoolsCount = document.getElementById('ledgerSchoolsCount');
-const ledgerTotalCount = document.getElementById('ledgerTotalCount');
-const ledgerTable = document.getElementById('ledgerTable');
-const ledgerTableBody = document.getElementById('ledgerTableBody');
-const ledgerPlaceholder = document.getElementById('ledgerPlaceholder');
-const ledgerPlaceholderText = document.getElementById('ledgerPlaceholderText');
-
-const clearWeekRecordsBtn = document.getElementById('clearWeekRecordsBtn');
-const clearAllRecordsBtn = document.getElementById('clearAllRecordsBtn');
-
-// Toast Container
-const toastContainer = document.getElementById('toastContainer');
-
-// ==========================================
-// Initialization
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    activeWeekRange = getInitialActiveWeek();
-
-    // If no week range is filled, prefill with active week or default range
-    if (!weekDateRangeInput.value.trim()) {
-        weekDateRangeInput.value = activeWeekRange;
-        clearWeekRangeBtn.style.display = 'block';
-    }
-
-    renderWeeklyTabs();
-    renderWeeklyLedger();
-
-    // Load official school extensions from Org_Email_Extensions_Complete.xlsx
-    loadDefaultOrgExtensionsFromExcel();
-});
-
-// ==========================================
-// Official School Org Extensions Engine
-// ==========================================
-function extractExtensionsFromWorkbook(workbook) {
-    if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) return null;
-    const sheetName = workbook.SheetNames.includes('Extensions') ? 'Extensions' : workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    if (!sheet) return null;
-
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-    if (!rows || rows.length === 0) return null;
-
-    const map = {};
-    let orgCol = -1;
-    let extCol = -1;
-
-    for (let r = 0; r < rows.length; r++) {
-        const row = rows[r];
-        if (!Array.isArray(row)) continue;
-
-        // Detect header row columns
-        for (let c = 0; c < row.length; c++) {
-            const val = String(row[c] || '').trim().toLowerCase();
-            if (val === 'org' || val === 'school' || val === 'school name' || val === 'organization') orgCol = c;
-            if (val === 'email extension' || val === 'extension' || val === 'domain' || val === 'email domain') extCol = c;
-        }
-
-        if (orgCol !== -1 && extCol !== -1 && r > 0) {
-            const org = String(row[orgCol] || '').trim();
-            let ext = String(row[extCol] || '').trim().toLowerCase();
-            if (ext.startsWith('@')) ext = ext.slice(1);
-            if (org && ext && ext.includes('.') && !ext.includes('email extension')) {
-                map[ext] = org;
-            }
-        }
-    }
-    return Object.keys(map).length > 0 ? map : null;
-}
-
-async function loadDefaultOrgExtensionsFromExcel() {
-    try {
-        const response = await fetch('Org_Email_Extensions_Complete.xlsx');
-        if (!response.ok) return;
-        const arrayBuffer = await response.arrayBuffer();
-        if (typeof XLSX !== 'undefined') {
-            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-            const extMap = extractExtensionsFromWorkbook(workbook);
-            if (extMap && Object.keys(extMap).length > 0) {
-                loadedOrgExtensions = extMap;
-                addConsoleLog(`Loaded ${Object.keys(extMap).length} official school extensions from Org_Email_Extensions_Complete.xlsx`, 'info');
-            }
-        }
-    } catch (e) {
-        // Built-in dictionary in worker handles mappings seamlessly
-        console.log('Using default built-in org extensions mapping', e);
-    }
-}
-
-// ==========================================
-// Storage & Migration Helpers
-// ==========================================
-function loadWeeklyRecords() {
-    try {
-        const raw = localStorage.getItem(WEEKLY_STORAGE_KEY);
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) return parsed;
-        }
-
-        // Migrate legacy single-school records if available
-        const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
-        if (legacyRaw) {
-            const legacyRecords = JSON.parse(legacyRaw);
-            if (Array.isArray(legacyRecords) && legacyRecords.length > 0) {
-                const migratedWeek = {
-                    weekRange: 'Previous Records',
-                    createdAt: new Date().toISOString(),
-                    schools: legacyRecords.map(r => ({
-                        id: r.id || 'sch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-                        schoolName: r.schoolName || 'Unknown School',
-                        extension: r.extension || '@unknown.gov.in',
-                        uniqueCount: r.uniqueCount || 0,
-                        csvContent: r.csvContent || null
-                    }))
-                };
-                const migrated = [migratedWeek];
-                saveWeeklyRecords(migrated);
-                return migrated;
-            }
-        }
-    } catch (e) {
-        console.error('Failed to load weekly records from storage', e);
-    }
-    return [];
-}
-
-function saveWeeklyRecords(data) {
-    try {
-        localStorage.setItem(WEEKLY_STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-        console.error('Failed to save weekly records to storage', e);
-        showToast('Storage quota warning: unable to save large record sets locally.', 'error');
-    }
-}
-
-function getInitialActiveWeek() {
-    if (weeklyRecords && weeklyRecords.length > 0) {
-        return weeklyRecords[0].weekRange;
-    }
-    return getWeekDateRangeString(0);
-}
-
-// ==========================================
-// Date Formatting & Presets
-// ==========================================
-function getOrdinalSuffix(day) {
-    if (day > 3 && day < 21) return 'th';
-    switch (day % 10) {
-        case 1:  return 'st';
-        case 2:  return 'nd';
-        case 3:  return 'rd';
-        default: return 'th';
-    }
-}
-
-function formatOrdinalDate(date) {
-    const day = date.getDate();
-    const suffix = getOrdinalSuffix(day);
-    const month = date.toLocaleDateString('en-US', { month: 'short' });
-    return `${day}${suffix} ${month}`;
-}
-
-// Returns e.g. "7th Nov - 13th Nov" for week offset (0 = this week, -1 = last week), running Saturday to Friday
-function getWeekDateRangeString(offsetWeeks = 0) {
-    const now = new Date();
-    // Anchor to Saturday of the target week (Saturday to Friday cycle)
-    const currentDay = now.getDay(); // 0 is Sun, 1 is Mon ... 5 is Fri, 6 is Sat
-    const diffToSaturday = -((currentDay + 1) % 7);
-    
-    const saturday = new Date(now);
-    saturday.setDate(now.getDate() + diffToSaturday + (offsetWeeks * 7));
-    
-    const friday = new Date(saturday);
-    friday.setDate(saturday.getDate() + 6); // 7-day week (Sat - Fri)
-
-    return `${formatOrdinalDate(saturday)} - ${formatOrdinalDate(friday)}`;
-}
-
-// Quick Date Action buttons
-btnPresetThisWeek.addEventListener('click', () => {
-    const val = getWeekDateRangeString(0);
-    setWeekDateRange(val);
-    showToast(`Week date range set to: ${val}`, 'info');
-});
-
-btnPresetLastWeek.addEventListener('click', () => {
-    const val = getWeekDateRangeString(-1);
-    setWeekDateRange(val);
-    showToast(`Week date range set to: ${val}`, 'info');
-});
-
-weekDateRangeInput.addEventListener('input', () => {
-    clearWeekRangeBtn.style.display = weekDateRangeInput.value.trim() ? 'block' : 'none';
-});
-
-clearWeekRangeBtn.addEventListener('click', () => {
-    weekDateRangeInput.value = '';
-    clearWeekRangeBtn.style.display = 'none';
-    weekDateRangeInput.focus();
-});
-
-// ==========================================
-// Interactive Week & Date Range Calendar Picker
-// ==========================================
-let calCurrentDate = new Date();
-let calMode = 'week'; // 'week' or 'custom'
-let calCustomStart = null;
-let calCustomEnd = null;
-
-function isSameDate(d1, d2) {
-    if (!d1 || !d2) return false;
-    return d1.getFullYear() === d2.getFullYear() &&
-           d1.getMonth() === d2.getMonth() &&
-           d1.getDate() === d2.getDate();
-}
-
-function setWeekDateRange(val) {
-    if (!weekDateRangeInput) return;
-    weekDateRangeInput.value = val;
-    if (clearWeekRangeBtn) clearWeekRangeBtn.style.display = 'block';
-    weekDateRangeInput.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-function selectWeekFromDate(date) {
-    const target = new Date(date);
-    const day = target.getDay(); // 0 is Sun, 1 is Mon ... 5 is Fri, 6 is Sat
-    const diffToSaturday = -((day + 1) % 7);
-    
-    const saturday = new Date(target);
-    saturday.setDate(target.getDate() + diffToSaturday);
-    
-    // 7-day week (Sat - Fri)
-    const friday = new Date(saturday);
-    friday.setDate(saturday.getDate() + 6);
-
-    const formattedRange = `${formatOrdinalDate(saturday)} - ${formatOrdinalDate(friday)}`;
-    setWeekDateRange(formattedRange);
-    renderCalendarGrid();
-    setTimeout(closeCalendar, 200);
-    showToast(`Week selected (Sat - Fri): ${formattedRange}`, 'info');
-}
-
-function handleCustomRangeClick(date) {
-    if (!calCustomStart || (calCustomStart && calCustomEnd)) {
-        calCustomStart = date;
-        calCustomEnd = null;
-        renderCalendarGrid();
-    } else {
-        calCustomEnd = date;
-        const start = calCustomStart < calCustomEnd ? calCustomStart : calCustomEnd;
-        const end = calCustomStart < calCustomEnd ? calCustomEnd : calCustomStart;
-        
-        const formattedRange = `${formatOrdinalDate(start)} - ${formatOrdinalDate(end)}`;
-        setWeekDateRange(formattedRange);
-        renderCalendarGrid();
-        setTimeout(closeCalendar, 200);
-        showToast(`Date range selected: ${formattedRange}`, 'info');
-    }
-}
-
-function renderCalendarGrid() {
-    if (!calDaysGrid || !calMonthTitle) return;
-    calDaysGrid.innerHTML = '';
-
-    const year = calCurrentDate.getFullYear();
-    const month = calCurrentDate.getMonth();
-
-    const monthNames = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ];
-    calMonthTitle.textContent = `${monthNames[month]} ${year}`;
-
-    // First day of month (0 = Sun, 1 = Mon ... 6 = Sat)
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-
-    // Week starts on Saturday (Sat=0, Sun=1, Mon=2, Tue=3, Wed=4, Thu=5, Fri=6):
-    const startDayOfWeek = (firstDay.getDay() + 1) % 7;
-
-    const totalDays = lastDay.getDate();
-    const prevMonthLastDay = new Date(year, month, 0).getDate();
-
-    const today = new Date();
-    const isThisMonth = today.getFullYear() === year && today.getMonth() === month;
-
-    const days = [];
-
-    // Previous month overflow days
-    for (let i = startDayOfWeek - 1; i >= 0; i--) {
-        const d = new Date(year, month - 1, prevMonthLastDay - i);
-        days.push({ date: d, isCurrentMonth: false });
-    }
-
-    // Current month days
-    for (let i = 1; i <= totalDays; i++) {
-        const d = new Date(year, month, i);
-        days.push({ date: d, isCurrentMonth: true });
-    }
-
-    // Next month overflow days
-    const remaining = 42 - days.length;
-    for (let i = 1; i <= remaining; i++) {
-        const d = new Date(year, month + 1, i);
-        days.push({ date: d, isCurrentMonth: false });
-    }
-
-    days.forEach((dayObj, index) => {
-        const cell = document.createElement('div');
-        cell.className = 'cal-day-cell';
-        if (!dayObj.isCurrentMonth) cell.classList.add('other-month');
-
-        const dNum = dayObj.date.getDate();
-        cell.textContent = dNum;
-        cell.dataset.date = dayObj.date.toISOString();
-        cell.dataset.weekRow = Math.floor(index / 7);
-
-        if (isThisMonth && dayObj.isCurrentMonth && dNum === today.getDate()) {
-            cell.classList.add('today');
-        }
-
-        // Custom range active markers
-        if (calCustomStart && !calCustomEnd) {
-            if (isSameDate(dayObj.date, calCustomStart)) {
-                cell.classList.add('range-start');
-            }
-        } else if (calCustomStart && calCustomEnd) {
-            const start = calCustomStart < calCustomEnd ? calCustomStart : calCustomEnd;
-            const end = calCustomStart < calCustomEnd ? calCustomEnd : calCustomStart;
-            if (isSameDate(dayObj.date, start)) cell.classList.add('range-start');
-            if (isSameDate(dayObj.date, end)) cell.classList.add('range-end');
-            if (dayObj.date > start && dayObj.date < end) cell.classList.add('in-range');
-        }
-
-        // Hover events
-        cell.addEventListener('mouseenter', () => {
-            if (calMode === 'week') {
-                const row = cell.dataset.weekRow;
-                calDaysGrid.querySelectorAll(`.cal-day-cell[data-week-row="${row}"]`).forEach(c => {
-                    c.classList.add('week-hover');
-                });
-            } else if (calMode === 'custom' && calCustomStart && !calCustomEnd) {
-                const hoverDate = dayObj.date;
-                const start = calCustomStart < hoverDate ? calCustomStart : hoverDate;
-                const end = calCustomStart < hoverDate ? hoverDate : calCustomStart;
-                calDaysGrid.querySelectorAll('.cal-day-cell').forEach(c => {
-                    const cDate = new Date(c.dataset.date);
-                    if (cDate >= start && cDate <= end) {
-                        c.classList.add('in-range');
-                    } else {
-                        c.classList.remove('in-range');
-                    }
-                });
-            }
-        });
-
-        cell.addEventListener('mouseleave', () => {
-            if (calMode === 'week') {
-                calDaysGrid.querySelectorAll('.cal-day-cell').forEach(c => c.classList.remove('week-hover'));
-            }
-        });
-
-        cell.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (calMode === 'week') {
-                selectWeekFromDate(dayObj.date);
-            } else {
-                handleCustomRangeClick(dayObj.date);
-            }
-        });
-
-        calDaysGrid.appendChild(cell);
-    });
-}
-
-function openCalendar() {
-    if (!calendarDropdown) return;
-    calendarDropdown.style.display = 'block';
-    renderCalendarGrid();
-}
-
-function closeCalendar() {
-    if (!calendarDropdown) return;
-    calendarDropdown.style.display = 'none';
-}
-
-function toggleCalendar() {
-    if (!calendarDropdown) return;
-    if (calendarDropdown.style.display === 'block') {
-        closeCalendar();
-    } else {
-        openCalendar();
-    }
-}
-
-if (calendarToggleBtn) {
-    calendarToggleBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleCalendar();
-    });
-}
-
-if (weekDateRangeInput) {
-    weekDateRangeInput.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (calendarDropdown && calendarDropdown.style.display !== 'block') {
-            openCalendar();
-        }
-    });
-}
-
-if (calPrevMonth) {
-    calPrevMonth.addEventListener('click', (e) => {
-        e.stopPropagation();
-        calCurrentDate.setMonth(calCurrentDate.getMonth() - 1);
-        renderCalendarGrid();
-    });
-}
-
-if (calNextMonth) {
-    calNextMonth.addEventListener('click', (e) => {
-        e.stopPropagation();
-        calCurrentDate.setMonth(calCurrentDate.getMonth() + 1);
-        renderCalendarGrid();
-    });
-}
-
-if (calModeWeek) {
-    calModeWeek.addEventListener('click', (e) => {
-        e.stopPropagation();
-        calMode = 'week';
-        calModeWeek.classList.add('active');
-        if (calModeCustom) calModeCustom.classList.remove('active');
-        calCustomStart = null;
-        calCustomEnd = null;
-        renderCalendarGrid();
-    });
-}
-
-if (calModeCustom) {
-    calModeCustom.addEventListener('click', (e) => {
-        e.stopPropagation();
-        calMode = 'custom';
-        calModeCustom.classList.add('active');
-        if (calModeWeek) calModeWeek.classList.remove('active');
-        calCustomStart = null;
-        calCustomEnd = null;
-        renderCalendarGrid();
-    });
-}
-
-if (calPresetThisWeek) {
-    calPresetThisWeek.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const val = getWeekDateRangeString(0);
-        setWeekDateRange(val);
-        closeCalendar();
-        showToast(`Week date range set to: ${val}`, 'info');
-    });
-}
-
-if (calPresetLastWeek) {
-    calPresetLastWeek.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const val = getWeekDateRangeString(-1);
-        setWeekDateRange(val);
-        closeCalendar();
-        showToast(`Week date range set to: ${val}`, 'info');
-    });
-}
-
-if (calCloseBtn) {
-    calCloseBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        closeCalendar();
-    });
-}
-
-document.addEventListener('click', (e) => {
-    if (calendarDropdown && calendarDropdown.style.display === 'block') {
-        if (!calendarDropdown.contains(e.target) && 
-            (!calendarToggleBtn || !calendarToggleBtn.contains(e.target)) && 
-            e.target !== weekDateRangeInput) {
-            closeCalendar();
-        }
-    }
-});
-
-// ==========================================
-// File Upload & Drag-and-Drop Handling
-// ==========================================
-uploadZone.addEventListener('click', () => fileInput.click());
-
-uploadZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadZone.classList.add('drag-active');
-});
-
-uploadZone.addEventListener('dragleave', (e) => {
-    e.preventDefault();
-    uploadZone.classList.remove('drag-active');
-});
-
-uploadZone.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    uploadZone.classList.remove('drag-active');
-    if (e.dataTransfer.files.length > 0) {
-        await handleFilesSelected(Array.from(e.dataTransfer.files));
-    }
-});
-
-fileInput.addEventListener('change', async (e) => {
-    if (e.target.files.length > 0) {
-        await handleFilesSelected(Array.from(e.target.files));
-    }
-});
-
-async function handleFilesSelected(newFiles) {
-    // 1. Check for Excel school extension files (.xlsx, .xls)
-    const excelFiles = newFiles.filter(f => f.name.toLowerCase().endsWith('.xlsx') || f.name.toLowerCase().endsWith('.xls'));
-    if (excelFiles.length > 0) {
-        for (const ef of excelFiles) {
-            try {
-                const arrayBuf = await ef.arrayBuffer();
-                if (typeof XLSX !== 'undefined') {
-                    const wb = XLSX.read(arrayBuf, { type: 'array' });
-                    const extMap = extractExtensionsFromWorkbook(wb);
-                    if (extMap && Object.keys(extMap).length > 0) {
-                        loadedOrgExtensions = extMap;
-                        addConsoleLog(`Loaded ${Object.keys(extMap).length} school extension mappings from "${ef.name}".`, 'success');
-                        showToast(`Loaded ${Object.keys(extMap).length} school extensions from "${ef.name}"!`, 'success');
-                    } else {
-                        showToast(`No school extension mappings found in "${ef.name}".`, 'warning');
-                    }
-                }
-            } catch (err) {
-                console.error('Error parsing uploaded Excel file:', err);
-                showToast(`Failed to parse "${ef.name}": ${err.message}`, 'error');
-            }
-        }
-    }
-
-    // 2. Filter CSV log files
-    const csvFiles = newFiles.filter(f => f.name.toLowerCase().endsWith('.csv') || f.type.includes('csv') || f.type === 'text/plain');
-
-    if (csvFiles.length === 0) {
-        if (excelFiles.length > 0) {
-            return; // Successfully updated extensions without needing CSV logs
-        }
-        showToast('Please upload CSV log files or school extension Excel files (.xlsx).', 'error');
-        return;
-    }
-
-    // Merge without duplicates based on name and size
-    csvFiles.forEach(file => {
-        const exists = uploadedFiles.some(f => f.name === file.name && f.size === file.size);
-        if (!exists) {
-            uploadedFiles.push(file);
-        }
-    });
-
-    renderFileList();
-    updateUploadStats();
-
-    addConsoleLog(`Added ${csvFiles.length} file(s). Total uploaded: ${uploadedFiles.length}. Scanning action values...`, 'info');
-
-    // Dynamically scan for Action values in the CSVs
-    showActionScanningState(true);
-    try {
-        detectedActions = await scanForActionValues(uploadedFiles);
-        renderActionFilterOptions(detectedActions);
-        showActionScanningState(false);
-    } catch (err) {
-        console.error('Error scanning actions:', err);
-        showActionScanningState(false);
-    }
-
-    const hasChecked = getActionCheckboxes().some(cb => cb.checked);
-    processBtn.disabled = !hasChecked || uploadedFiles.length === 0;
-}
-
-function renderFileList() {
-    fileList.innerHTML = '';
-    if (uploadedFiles.length === 0) {
-        return;
-    }
-
-    uploadedFiles.forEach((file, index) => {
-        const item = document.createElement('div');
-        item.className = 'file-item';
-        item.innerHTML = `
-            <div class="file-item-info">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-                <span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
-            </div>
-            <div class="file-item-right">
-                <span class="file-size">${formatBytes(file.size)}</span>
-                <button type="button" class="file-remove" onclick="removeFileByIndex(${index})" title="Remove file">✕</button>
-            </div>
-        `;
-        fileList.appendChild(item);
-    });
-}
-
-window.removeFileByIndex = async function(index) {
-    uploadedFiles.splice(index, 1);
-    renderFileList();
-    updateUploadStats();
-
-    if (uploadedFiles.length > 0) {
-        showActionScanningState(true);
-        detectedActions = await scanForActionValues(uploadedFiles);
-        renderActionFilterOptions(detectedActions);
-        showActionScanningState(false);
-    } else {
-        detectedActions = [];
-        renderActionFilterOptions([]);
-        selectedActionsText.textContent = 'Upload CSV files to detect actions...';
-    }
-
-    const hasChecked = getActionCheckboxes().some(cb => cb.checked);
-    processBtn.disabled = !hasChecked || uploadedFiles.length === 0;
-};
-
-function updateUploadStats() {
-    statFiles.textContent = uploadedFiles.length;
-}
-
-// ==========================================
-// Dynamic Action Detection from CSV Files
-// ==========================================
+const previewTable = document.getElementById('previewTable');
+const previewTableBody = document.getElementById('previewTableBody');
+const previewPlaceholder = document.getElementById('previewPlaceholder');
+
+// Helper: Custom CSV parsing for header reading in main thread
 function parseCSVLine(text) {
     const fields = [];
     let inQuote = false;
@@ -741,26 +66,36 @@ function parseCSVLine(text) {
     return fields;
 }
 
+// Format bytes to readable size
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Add logs to the console panel
+function addConsoleLog(message, type = 'info', timestamp = null) {
+    const time = timestamp || new Date().toLocaleTimeString();
+    const logEl = document.createElement('div');
+    logEl.className = `console-log ${type}`;
+    logEl.innerHTML = `<span class="timestamp">[${time}]</span>${message}`;
+    consolePanel.appendChild(logEl);
+    consolePanel.scrollTop = consolePanel.scrollHeight;
+}
+
+// ==========================================
+// Dynamic Action Detection from CSV Files
+// ==========================================
+
+// Detect the action column index from headers
 function detectActionColumnIndex(headers) {
-    const exactKeywords = [
-        'activity type', 'action', 'activity', 'event type', 'action name',
-        'operation', 'event', 'type', 'permission'
-    ];
-    for (const kw of exactKeywords) {
+    const keywords = ['action', 'event', 'activity', 'operation', 'type', 'permission'];
+    for (const kw of keywords) {
         for (let i = 0; i < headers.length; i++) {
             const header = headers[i].toLowerCase().trim();
-            if (header === kw) {
-                return i;
-            }
-        }
-    }
-    for (let i = 0; i < headers.length; i++) {
-        const header = headers[i].toLowerCase().trim();
-        if (header.includes('time') || header.includes('date') || header.includes('id') || header.includes('user') || header.includes('ip')) {
-            continue;
-        }
-        for (const kw of ['activity', 'action', 'event', 'operation']) {
-            if (header.includes(kw)) {
+            if (header === kw || header.includes(kw)) {
                 return i;
             }
         }
@@ -768,10 +103,12 @@ function detectActionColumnIndex(headers) {
     return -1;
 }
 
+// Scan uploaded files to find unique action values
 async function scanForActionValues(files) {
     const actionSet = new Set();
     
     for (const file of files) {
+        // Read a sample from each file (first 2MB is plenty to detect all action types)
         const sampleSize = Math.min(file.size, 2 * 1024 * 1024);
         const slice = file.slice(0, sampleSize);
         const text = await readBlobAsText(slice);
@@ -779,6 +116,7 @@ async function scanForActionValues(files) {
         const lines = text.split(/\r?\n/);
         if (lines.length < 2) continue;
         
+        // Parse header
         const headers = parseCSVLine(lines[0]);
         const actionColIdx = detectActionColumnIndex(headers);
         
@@ -787,6 +125,7 @@ async function scanForActionValues(files) {
             continue;
         }
         
+        // Scan data rows for unique action values
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim();
             if (!line) continue;
@@ -813,96 +152,197 @@ function readBlobAsText(blob) {
     });
 }
 
-function showActionScanningState(isScanning) {
-    if (isScanning) {
-        selectedActionsText.textContent = 'Detecting actions from CSV...';
-        dropdownTrigger.classList.add('disabled');
-    } else {
-        dropdownTrigger.classList.remove('disabled');
-        updateSelectedActionsText();
-    }
-}
-
-function renderActionFilterOptions(actions) {
+// Build the dropdown checkboxes dynamically from detected action values
+function populateActionDropdown(actions, selectAll = true) {
     actionItemsContainer.innerHTML = '';
+    detectedActions = actions;
     
-    if (actions.length === 0) {
-        actionItemsContainer.innerHTML = `<div style="padding: 0.5rem 0.75rem; color: var(--text-muted); font-size: 0.8rem;">No actions detected yet.</div>`;
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.disabled = true;
-        updateSelectedActionsText();
-        return;
-    }
-
-    selectAllCheckbox.disabled = false;
-
-    // Default pre-select "Read", "Create", "Create with public Link"
-    const defaultSelected = ['read', 'create', 'create with public link'];
-
-    actions.forEach(act => {
-        const isPreChecked = defaultSelected.includes(act.toLowerCase());
+    actions.forEach(action => {
         const label = document.createElement('label');
         label.className = 'dropdown-item';
-        label.innerHTML = `
-            <input type="checkbox" class="action-checkbox" value="${escapeHtml(act)}" ${isPreChecked ? 'checked' : ''}>
-            <span>${escapeHtml(act)}</span>
-        `;
         
-        const cb = label.querySelector('.action-checkbox');
-        cb.addEventListener('change', () => {
-            syncSelectAllCheckbox();
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = action;
+        checkbox.checked = selectAll; // Select all by default on first detection
+        
+        const span = document.createElement('span');
+        span.textContent = action;
+        
+        label.appendChild(checkbox);
+        label.appendChild(span);
+        actionItemsContainer.appendChild(label);
+        
+        // Attach change listener
+        checkbox.addEventListener('change', () => {
+            const allCheckboxes = getActionCheckboxes();
+            const allChecked = allCheckboxes.every(c => c.checked);
+            selectAllCheckbox.checked = allChecked;
             updateSelectedActionsText();
-            const hasChecked = getActionCheckboxes().some(c => c.checked);
+            
+            // Enable process button if we have files and at least one checkbox is selected
+            const hasChecked = allCheckboxes.some(cb => cb.checked);
             processBtn.disabled = !hasChecked || uploadedFiles.length === 0;
         });
-        
-        actionItemsContainer.appendChild(label);
     });
-
-    syncSelectAllCheckbox();
+    
+    // Update select all state
+    selectAllCheckbox.checked = selectAll;
     updateSelectedActionsText();
 }
 
+// Get all dynamically created action checkboxes
 function getActionCheckboxes() {
-    return Array.from(document.querySelectorAll('.action-checkbox'));
+    return Array.from(actionItemsContainer.querySelectorAll('input[type="checkbox"]'));
 }
 
-function syncSelectAllCheckbox() {
-    const actionCheckboxes = getActionCheckboxes();
-    if (actionCheckboxes.length === 0) {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = false;
+// Update the selected actions text display
+function updateSelectedActionsText() {
+    const checkboxes = getActionCheckboxes();
+    const selected = checkboxes
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+    
+    if (checkboxes.length === 0) {
+        selectedActionsText.textContent = "Upload CSV files to detect actions...";
+    } else if (selected.length === 0) {
+        selectedActionsText.textContent = "Select actions...";
+    } else if (selected.length === checkboxes.length) {
+        selectedActionsText.textContent = `All actions selected (${selected.length})`;
+    } else {
+        selectedActionsText.textContent = selected.join(', ');
+    }
+}
+
+// ==========================================
+// File Upload & Handling (June 4 Baseline)
+// ==========================================
+
+// Drag & drop handlers
+uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+});
+
+uploadZone.addEventListener('dragleave', () => {
+    uploadZone.classList.remove('dragover');
+});
+
+uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+        handleFileSelection(e.dataTransfer.files);
+    }
+});
+
+fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+        handleFileSelection(fileInput.files);
+    }
+});
+
+// Process Selected Files
+async function handleFileSelection(fileListObj) {
+    const newFiles = Array.from(fileListObj).filter(file => file.name.endsWith('.csv'));
+    
+    if (newFiles.length === 0) {
+        addConsoleLog('Selected files are not valid CSV format.', 'error');
         return;
     }
-    const allChecked = actionCheckboxes.every(cb => cb.checked);
-    const someChecked = actionCheckboxes.some(cb => cb.checked);
-    selectAllCheckbox.checked = allChecked;
-    selectAllCheckbox.indeterminate = !allChecked && someChecked;
+
+    uploadedFiles = [...uploadedFiles, ...newFiles];
+    addConsoleLog(`Added ${newFiles.length} CSV file(s). Total files: ${uploadedFiles.length}.`, 'info');
+    
+    // Update UI lists and controls
+    renderFileList();
+    updateStatsBoard();
+    
+    // Scan all uploaded files for action values and populate dropdown
+    addConsoleLog('Scanning CSV files to detect action filter values...', 'info');
+    try {
+        const actions = await scanForActionValues(uploadedFiles);
+        if (actions.length > 0) {
+            populateActionDropdown(actions, true);
+            addConsoleLog(`Detected ${actions.length} unique action types: ${actions.join(', ')}`, 'success');
+            processBtn.disabled = false;
+        } else {
+            addConsoleLog('No action values detected in CSV files. Check column headers.', 'error');
+            processBtn.disabled = true;
+        }
+    } catch (err) {
+        addConsoleLog(`Error scanning CSV files: ${err.message}`, 'error');
+    }
 }
 
-function updateSelectedActionsText() {
-    const actionCheckboxes = getActionCheckboxes();
-    const checked = actionCheckboxes.filter(cb => cb.checked);
+// Render files inside the uploaded files list card
+function renderFileList() {
+    fileList.innerHTML = '';
+    uploadedFiles.forEach((file, index) => {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        
+        item.innerHTML = `
+            <div class="file-info">
+                <span class="file-name" title="${file.name}">${file.name}</span>
+                <span class="file-size">${formatBytes(file.size)}</span>
+            </div>
+            <button class="file-remove" data-index="${index}">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        `;
+        
+        item.querySelector('.file-remove').addEventListener('click', (e) => {
+            const idx = parseInt(e.currentTarget.getAttribute('data-index'));
+            removeFile(idx);
+        });
+        
+        fileList.appendChild(item);
+    });
+
+    processBtn.disabled = uploadedFiles.length === 0;
+}
+
+function removeFile(index) {
+    addConsoleLog(`Removed file "${uploadedFiles[index].name}".`, 'info');
+    uploadedFiles.splice(index, 1);
+    renderFileList();
+    updateStatsBoard();
     
-    if (actionCheckboxes.length === 0) {
-        selectedActionsText.textContent = 'Upload CSV files to detect actions...';
-    } else if (checked.length === 0) {
-        selectedActionsText.textContent = 'No actions selected';
-    } else if (checked.length === actionCheckboxes.length) {
-        selectedActionsText.textContent = `All Actions Selected (${checked.length})`;
+    if (uploadedFiles.length === 0) {
+        // Clear the action dropdown if no files remain
+        actionItemsContainer.innerHTML = '';
+        detectedActions = [];
+        selectAllCheckbox.checked = false;
+        updateSelectedActionsText();
+        processBtn.disabled = true;
+    }
+}
+
+function updateStatsBoard(stats = null) {
+    statFiles.textContent = uploadedFiles.length;
+    if (stats) {
+        statProcessed.textContent = stats.totalRawRecords.toLocaleString();
+        statFiltered.textContent = stats.totalMatchingActions.toLocaleString();
+        statClean.textContent = stats.finalCleanCount.toLocaleString();
     } else {
-        const names = checked.map(cb => cb.value).slice(0, 2).join(', ');
-        const extra = checked.length > 2 ? ` +${checked.length - 2} more` : '';
-        selectedActionsText.textContent = `${names}${extra}`;
+        statProcessed.textContent = '0';
+        statFiltered.textContent = '0';
+        statClean.textContent = '0';
     }
 }
 
 // ==========================================
-// Process Files Pipeline
+// Process Action (June 4 Baseline)
 // ==========================================
+
 processBtn.addEventListener('click', () => {
     if (uploadedFiles.length === 0) return;
 
+    // Get selected action values from dynamic checkboxes
     const actionCheckboxes = getActionCheckboxes();
     const actionValues = actionCheckboxes
         .filter(cb => cb.checked)
@@ -911,47 +351,45 @@ processBtn.addEventListener('click', () => {
 
     if (!actionValues) {
         addConsoleLog('No action filters selected. Please select at least one.', 'error');
-        showToast('Please select at least one action filter.', 'error');
         return;
     }
 
-    let weekRange = weekDateRangeInput.value.trim();
-    if (!weekRange) {
-        weekRange = getWeekDateRangeString(0);
-        weekDateRangeInput.value = weekRange;
-        clearWeekRangeBtn.style.display = 'block';
-    }
+    // UI Configuration state
+    const emailConfig = 'auto';
+    const actionConfig = 'auto';
 
+    // Toggle interactive states
     toggleInputs(true);
     
+    // Clear and show processing UI
     progressBanner.style.display = 'block';
-    progressStatusText.textContent = `Analyzing multi-school content dumps for "${weekRange}"...`;
+    progressStatusText.textContent = 'Analyzing data streams...';
     progressPercentText.textContent = '0%';
     progressBarFill.style.width = '0%';
-    
-    unifiedDownloadBtn.disabled = true;
-    nextBatchBtn.disabled = true;
+    downloadBtn.disabled = true;
 
-    if (masterBlobUrl) {
-        URL.revokeObjectURL(masterBlobUrl);
-        masterBlobUrl = null;
+    // Reset blob URL
+    if (processedBlobUrl) {
+        URL.revokeObjectURL(processedBlobUrl);
+        processedBlobUrl = null;
     }
 
-    addConsoleLog(`Starting weekly multi-school analysis for week "${weekRange}" (${uploadedFiles.length} file(s))...`, 'info');
-    addConsoleLog(`Active action filters: ${actionValues}`, 'info');
+    addConsoleLog('Initializing background worker thread...', 'info');
+    addConsoleLog(`Active filters: ${actionValues}`, 'info');
 
-    worker = new Worker('parser-worker.js?v=3.1.0');
+    // Create web worker
+    worker = new Worker('parser-worker.js?v=2.1.0');
 
+    // Send processing data
     worker.postMessage({
         files: uploadedFiles,
-        emailColConfig: 'auto',
-        actionColConfig: 'auto',
-        actionValuesRaw: actionValues,
-        customOrgExtensions: loadedOrgExtensions
+        emailColConfig: emailConfig,
+        actionColConfig: actionConfig,
+        actionValuesRaw: actionValues
     });
 
     worker.onmessage = function(e) {
-        const { type, percent, fileName, rawRecords, matchingActions, cleanEmails, schoolsDetected, message, logLevel, data } = e.data;
+        const { type, percent, fileName, rawRecords, matchingActions, adobeExcluded, cleanEmails, timestamp, message, logLevel, data } = e.data;
 
         switch (type) {
             case 'PROGRESS':
@@ -959,24 +397,23 @@ processBtn.addEventListener('click', () => {
                 progressPercentText.textContent = `${percent}%`;
                 progressStatusText.textContent = `Parsing "${fileName}" [${percent}%]`;
                 
+                // Update running stats
                 statProcessed.textContent = rawRecords.toLocaleString();
                 statFiltered.textContent = matchingActions.toLocaleString();
                 statClean.textContent = cleanEmails.toLocaleString();
-                statSchools.textContent = (schoolsDetected || 0).toLocaleString();
                 break;
 
             case 'LOG':
-                addConsoleLog(message, logLevel, e.data.timestamp);
+                addConsoleLog(e.data.message, e.data.logLevel, e.data.timestamp);
                 break;
 
             case 'COMPLETE':
-                addConsoleLog(`Finished processing! Detected ${data.schoolsList.length} school(s) with ${data.stats.finalCleanCount.toLocaleString()} grand unique clean emails.`, 'success');
-                finishProcessing(data, weekRange);
+                addConsoleLog('Pipeline finished successfully.', 'success');
+                finishProcessing(e.data.data);
                 break;
 
             case 'ERROR':
-                addConsoleLog(`Processing Error: ${message}`, 'error');
-                showToast(`Processing error: ${message}`, 'error');
+                addConsoleLog(`Processing Error: ${e.data.message}`, 'error');
                 handleWorkerFailure();
                 break;
         }
@@ -984,20 +421,15 @@ processBtn.addEventListener('click', () => {
 
     worker.onerror = function(err) {
         addConsoleLog(`Worker thread failure: ${err.message}`, 'error');
-        showToast('Worker thread error occurred.', 'error');
         handleWorkerFailure();
     };
 });
 
 function toggleInputs(disabled) {
     fileInput.disabled = disabled;
-    weekDateRangeInput.disabled = disabled;
-    btnPresetThisWeek.disabled = disabled;
-    btnPresetLastWeek.disabled = disabled;
     selectAllCheckbox.disabled = disabled;
     const actionCheckboxes = getActionCheckboxes();
     actionCheckboxes.forEach(cb => cb.disabled = disabled);
-    
     if (disabled) {
         dropdownTrigger.classList.add('disabled');
         dropdownMenu.style.display = 'none';
@@ -1005,9 +437,9 @@ function toggleInputs(disabled) {
     } else {
         dropdownTrigger.classList.remove('disabled');
     }
-    
     processBtn.disabled = disabled;
     
+    // Disable file removal buttons
     const removeButtons = document.querySelectorAll('.file-remove');
     removeButtons.forEach(btn => btn.disabled = disabled);
 
@@ -1029,30 +461,29 @@ function handleWorkerFailure() {
     }
 }
 
-function finishProcessing(result, weekRange) {
+function finishProcessing(result) {
+    // Hide progress bar spinner
     progressBanner.style.border = '1px solid rgba(16, 185, 129, 0.3)';
     progressBanner.style.background = 'rgba(16, 185, 129, 0.05)';
-    progressStatusText.innerHTML = `<span style="color: var(--color-success); font-weight: 600;">Processing Finished (${result.schoolsList.length} schools detected for ${escapeHtml(weekRange)})</span>`;
+    progressStatusText.innerHTML = `<span style="color: var(--color-success); font-weight: 600;">Processing Finished</span>`;
     progressBarFill.style.width = '100%';
     progressPercentText.textContent = '100%';
     
-    // Update Stats Board
-    statFiles.textContent = result.stats.filesProcessed.toLocaleString();
-    statProcessed.textContent = result.stats.totalRawRecords.toLocaleString();
-    statFiltered.textContent = result.stats.totalMatchingActions.toLocaleString();
-    statClean.textContent = result.stats.finalCleanCount.toLocaleString();
-    statSchools.textContent = result.schoolsList.length.toLocaleString();
+    // Update metrics boards
+    updateStatsBoard(result.stats);
 
-    // Save current batch schools
-    currentBatchSchools = result.schoolsList;
+    // Build Preview Table (up to 100 rows)
+    renderPreviewTable(result.previewRows);
 
-    // Set Master Combined CSV Blob
-    const masterBlob = new Blob([result.masterCsvContent], { type: 'text/csv;charset=utf-8;' });
-    masterBlobUrl = URL.createObjectURL(masterBlob);
-    unifiedDownloadBtn.disabled = false;
-    nextBatchBtn.disabled = false;
+    // Save final CSV blob URL for download
+    const blob = new Blob([result.csvContent], { type: 'text/csv;charset=utf-8;' });
+    processedBlobUrl = URL.createObjectURL(blob);
+    downloadBtn.disabled = false;
 
+    // Reset controls state
     toggleInputs(false);
+    
+    // Keep process button enabled so user can re-process with different filters
     const hasChecked = getActionCheckboxes().some(cb => cb.checked);
     processBtn.disabled = !hasChecked || uploadedFiles.length === 0;
 
@@ -1060,650 +491,96 @@ function finishProcessing(result, weekRange) {
         worker.terminate();
         worker = null;
     }
-
-    // Auto-save/merge detected schools into the weekly ledger
-    saveBatchSchoolsToWeek(weekRange, result.schoolsList);
-
-    showToast(`Processed ${result.schoolsList.length} schools (${result.stats.finalCleanCount.toLocaleString()} clean emails) for ${weekRange}!`, 'success');
 }
 
-// ==========================================
-// Unified Single Download Controller (Combined, Separate, Excel)
-// ==========================================
-unifiedDownloadBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (unifiedDownloadBtn.disabled) return;
-    const isVisible = unifiedDownloadMenu.style.display === 'flex';
-    unifiedDownloadMenu.style.display = isVisible ? 'none' : 'flex';
-    unifiedDownloadBtn.classList.toggle('active', !isVisible);
-});
-
-document.addEventListener('click', (e) => {
-    if (!unifiedDownloadBtn.contains(e.target) && !unifiedDownloadMenu.contains(e.target)) {
-        unifiedDownloadMenu.style.display = 'none';
-        unifiedDownloadBtn.classList.remove('active');
-    }
-});
-
-btnDownloadCombined.addEventListener('click', () => {
-    unifiedDownloadMenu.style.display = 'none';
-    unifiedDownloadBtn.classList.remove('active');
-    downloadMasterCsv();
-});
-
-btnDownloadSeparate.addEventListener('click', () => {
-    unifiedDownloadMenu.style.display = 'none';
-    unifiedDownloadBtn.classList.remove('active');
-    downloadAllSeparateCsvs();
-});
-
-btnDownloadExcel.addEventListener('click', () => {
-    unifiedDownloadMenu.style.display = 'none';
-    unifiedDownloadBtn.classList.remove('active');
-    if (typeof XLSX !== 'undefined') {
-        exportMultiSheetExcel();
-    } else {
-        exportFallbackMultiWeekCsv();
-    }
-});
-
-function downloadMasterCsv() {
-    let weekName = activeWeekRange || 'Weekly';
-
-    if (masterBlobUrl) {
-        const sanitizedRange = weekName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-        const dateStr = new Date().toISOString().slice(0, 10);
-        const link = document.createElement('a');
-        link.href = masterBlobUrl;
-        link.download = `All_Schools_Clean_Emails_${sanitizedRange}_${dateStr}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        addConsoleLog(`Downloaded combined clean CSV for "${weekName}".`, 'success');
-        showToast(`Downloaded combined CSV for "${weekName}"!`, 'success');
+function renderPreviewTable(rows) {
+    previewTableBody.innerHTML = '';
+    if (rows.length === 0) {
+        previewTable.style.display = 'none';
+        previewPlaceholder.style.display = 'block';
+        previewPlaceholder.querySelector('p').textContent = 'The filter yielded zero email records.';
         return;
     }
 
-    // On-the-fly generation from active week's schools if masterBlobUrl isn't in memory
-    const activeWeek = weeklyRecords.find(w => activeWeekRange && w.weekRange.toLowerCase() === activeWeekRange.toLowerCase()) || weeklyRecords[0];
-    if (!activeWeek || !activeWeek.schools || activeWeek.schools.length === 0) {
-        showToast('No school records available to download.', 'error');
-        return;
-    }
-
-    let combinedRows = "User Email,School Name,Extension\n";
-    const emailSet = new Set();
-    activeWeek.schools.forEach(sch => {
-        if (sch.csvContent) {
-            const lines = sch.csvContent.split(/\r?\n/).slice(1);
-            lines.forEach(line => {
-                const em = line.trim().replace(/^"|"$/g, '');
-                if (em && !emailSet.has(em)) {
-                    emailSet.add(em);
-                    const escaped = em.includes(',') ? `"${em}"` : em;
-                    const schEscaped = sch.schoolName.includes(',') ? `"${sch.schoolName}"` : sch.schoolName;
-                    combinedRows += `${escaped},${schEscaped},${sch.extension}\n`;
-                }
-            });
-        }
-    });
-
-    const blob = new Blob([combinedRows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const sanitizedRange = weekName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `All_Schools_Clean_Emails_${sanitizedRange}_${dateStr}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    addConsoleLog(`Downloaded combined clean CSV for "${weekName}".`, 'success');
-    showToast(`Downloaded combined CSV for "${weekName}"!`, 'success');
-}
-
-function downloadAllSeparateCsvs() {
-    let activeWeek = weeklyRecords.find(w => activeWeekRange && w.weekRange.toLowerCase() === activeWeekRange.toLowerCase());
-    if (!activeWeek && weeklyRecords.length > 0) activeWeek = weeklyRecords[0];
-
-    if (!activeWeek || !activeWeek.schools || activeWeek.schools.length === 0) {
-        showToast('No schools in current week to download.', 'error');
-        return;
-    }
-
-    let downloadCount = 0;
-    activeWeek.schools.forEach((sch, i) => {
-        if (sch.csvContent) {
-            downloadCount++;
-            setTimeout(() => {
-                window.downloadSchoolCSV(sch.id);
-            }, i * 250);
-        }
-    });
-
-    if (downloadCount > 0) {
-        addConsoleLog(`Triggered separate clean CSV downloads for ${downloadCount} school(s) in week "${activeWeek.weekRange}".`, 'success');
-        showToast(`Downloading ${downloadCount} separate clean CSV files for "${activeWeek.weekRange}"!`, 'success');
-    } else {
-        showToast('No CSV content available for current week schools.', 'info');
-    }
-}
-
-// ==========================================
-// Weekly School Records Summary Ledger & Tabs
-// ==========================================
-function saveBatchSchoolsToWeek(weekRange, detectedSchools) {
-    if (!weekRange || !detectedSchools || detectedSchools.length === 0) return;
-
-    let targetWeek = weeklyRecords.find(w => w.weekRange.toLowerCase() === weekRange.toLowerCase());
-
-    if (!targetWeek) {
-        targetWeek = {
-            weekRange: weekRange,
-            createdAt: new Date().toISOString(),
-            schools: []
-        };
-        // Add to front of weeks list
-        weeklyRecords.unshift(targetWeek);
-    }
-
-    // Merge or add detected schools
-    detectedSchools.forEach(sch => {
-        const existingIdx = targetWeek.schools.findIndex(s => 
-            s.extension.toLowerCase() === sch.extension.toLowerCase() ||
-            s.schoolName.toLowerCase() === sch.schoolName.toLowerCase()
-        );
-
-        const schoolRecord = {
-            id: 'sch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-            schoolName: sch.schoolName,
-            extension: sch.extension,
-            uniqueCount: sch.uniqueCount,
-            csvContent: sch.csvContent,
-            sampleEmails: sch.sampleEmails || []
-        };
-
-        if (existingIdx !== -1) {
-            // Update existing record
-            targetWeek.schools[existingIdx] = schoolRecord;
-        } else {
-            // Append new record
-            targetWeek.schools.push(schoolRecord);
-        }
-    });
-
-    // Sort schools alphabetically
-    targetWeek.schools.sort((a, b) => a.schoolName.localeCompare(b.schoolName));
-
-    activeWeekRange = targetWeek.weekRange;
-    saveWeeklyRecords(weeklyRecords);
-    renderWeeklyTabs();
-    renderWeeklyLedger();
-}
-
-function renderWeeklyTabs() {
-    weekTabsBar.innerHTML = '';
-    
-    if (weeklyRecords.length === 0) {
-        weekTabsBar.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-muted); padding: 0.4rem 0.5rem;">No weekly tabs created yet. Upload a batch or click "+ New Week Tab".</span>`;
-        return;
-    }
-
-    weeklyRecords.forEach(week => {
-        const isActive = activeWeekRange && week.weekRange.toLowerCase() === activeWeekRange.toLowerCase();
-        const tabBtn = document.createElement('button');
-        tabBtn.type = 'button';
-        tabBtn.className = `week-tab-btn ${isActive ? 'active' : ''}`;
-        
-        tabBtn.innerHTML = `
-            <span>${escapeHtml(week.weekRange)}</span>
-            <span class="week-tab-badge">${week.schools.length}</span>
-            <button type="button" class="week-tab-close" title="Remove this week tab" onclick="window.removeWeekTab('${escapeHtml(week.weekRange)}', event)">✕</button>
-        `;
-
-        tabBtn.addEventListener('click', (e) => {
-            if (e.target.classList.contains('week-tab-close')) return;
-            activeWeekRange = week.weekRange;
-            weekDateRangeInput.value = week.weekRange;
-            clearWeekRangeBtn.style.display = 'block';
-            renderWeeklyTabs();
-            renderWeeklyLedger();
-        });
-
-        weekTabsBar.appendChild(tabBtn);
-
-        if (isActive) {
-            requestAnimationFrame(() => {
-                tabBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-            });
-        }
-    });
-}
-
-// Enable horizontal scrolling with mouse wheel on week tabs bar
-if (weekTabsBar) {
-    weekTabsBar.addEventListener('wheel', (e) => {
-        if (e.deltaY !== 0) {
-            e.preventDefault();
-            weekTabsBar.scrollLeft += e.deltaY;
-        }
-    }, { passive: false });
-}
-
-window.removeWeekTab = function(weekRangeName, event) {
-    if (event) event.stopPropagation();
-    
-    const week = weeklyRecords.find(w => w.weekRange === weekRangeName);
-    if (!week) return;
-
-    if (confirm(`Are you sure you want to delete the week tab "${weekRangeName}" and its ${week.schools.length} school record(s)?`)) {
-        weeklyRecords = weeklyRecords.filter(w => w.weekRange !== weekRangeName);
-        if (activeWeekRange === weekRangeName) {
-            activeWeekRange = weeklyRecords.length > 0 ? weeklyRecords[0].weekRange : null;
-        }
-        saveWeeklyRecords(weeklyRecords);
-        renderWeeklyTabs();
-        renderWeeklyLedger();
-        showToast(`Deleted week tab "${weekRangeName}".`, 'info');
-    }
-};
-
-function renderWeeklyLedger() {
-    ledgerTableBody.innerHTML = '';
-
-    if (weeklyRecords.length === 0) {
-        ledgerTable.style.display = 'none';
-        ledgerPlaceholder.style.display = 'block';
-        ledgerActiveWeekDisplay.textContent = 'No Week Selected';
-        ledgerSchoolsCount.textContent = '0';
-        ledgerTotalCount.textContent = '0';
-        unifiedDownloadBtn.disabled = true;
-        return;
-    }
-
-    // Find active week or select the first available
-    let activeWeek = weeklyRecords.find(w => activeWeekRange && w.weekRange.toLowerCase() === activeWeekRange.toLowerCase());
-    if (!activeWeek) {
-        activeWeek = weeklyRecords[0];
-        activeWeekRange = activeWeek.weekRange;
-        renderWeeklyTabs();
-    }
-
-    ledgerActiveWeekDisplay.textContent = activeWeek.weekRange;
-    ledgerSchoolsCount.textContent = activeWeek.schools.length.toLocaleString();
-
-    let grandTotalUnique = 0;
-    activeWeek.schools.forEach(s => {
-        grandTotalUnique += (Number(s.uniqueCount) || 0);
-    });
-    ledgerTotalCount.textContent = grandTotalUnique.toLocaleString();
-
-    if (activeWeek.schools.length === 0) {
-        ledgerTable.style.display = 'none';
-        ledgerPlaceholder.style.display = 'block';
-        ledgerPlaceholderText.textContent = `No schools in "${activeWeek.weekRange}" yet.`;
-        unifiedDownloadBtn.disabled = true;
-        return;
-    }
-
-    unifiedDownloadBtn.disabled = false;
-    ledgerPlaceholder.style.display = 'none';
-    ledgerTable.style.display = 'table';
-
-    activeWeek.schools.forEach((sch, index) => {
+    rows.forEach((row, index) => {
         const tr = document.createElement('tr');
-        tr.setAttribute('data-id', sch.id);
-
         tr.innerHTML = `
             <td><span class="row-index">${index + 1}</span></td>
-            <td>
-                <div class="school-name-cell" id="schoolNameCell_${sch.id}">
-                    <span class="school-name-text" onclick="window.startInlineEditSchool('${sch.id}')" title="Click to edit school name">${escapeHtml(sch.schoolName)}</span>
-                    <button class="btn-inline-edit" onclick="window.startInlineEditSchool('${sch.id}')" title="Edit name">
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                    </button>
-                </div>
-            </td>
-            <td>
-                <span class="extension-badge">${escapeHtml(sch.extension)}</span>
-            </td>
-            <td style="text-align: right;">
-                <span class="unique-count-badge">${Number(sch.uniqueCount).toLocaleString()}</span>
-            </td>
-            <td>
-                <div class="row-actions-group">
-                    ${sch.csvContent ? `
-                        <button class="btn-table-action download" onclick="window.downloadSchoolCSV('${sch.id}')" title="Download clean emails for this school">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        </button>
-                    ` : ''}
-                    <button class="btn-table-action delete" onclick="window.deleteSchoolRecord('${sch.id}')" title="Delete record from ledger">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                    </button>
-                </div>
-            </td>
+            <td><strong>${row.email}</strong></td>
         `;
-
-        ledgerTableBody.appendChild(tr);
+        previewTableBody.appendChild(tr);
     });
 
-    // Summary Total Row for Active Week
-    const totalRow = document.createElement('tr');
-    totalRow.className = 'ledger-summary-row';
-    totalRow.style.background = 'rgba(255, 255, 255, 0.04)';
-    totalRow.style.fontWeight = '700';
-    totalRow.innerHTML = `
-        <td style="text-align: center; color: var(--color-primary-light);">∑</td>
-        <td style="color: #ffffff;">Total (${activeWeek.schools.length} Schools)</td>
-        <td><span style="font-size: 0.75rem; color: var(--text-muted);">All Extensions</span></td>
-        <td style="text-align: right; color: var(--color-success); font-size: 1rem;">
-            ${grandTotalUnique.toLocaleString()}
-        </td>
-        <td style="text-align: center; color: var(--text-muted); font-size: 0.8rem;">—</td>
-    `;
-    ledgerTableBody.appendChild(totalRow);
+    previewPlaceholder.style.display = 'none';
+    previewTable.style.display = 'table';
 }
 
-// Inline Editing for School Name in Ledger
-window.startInlineEditSchool = function(id) {
-    let targetSchool = null;
-    let targetWeek = null;
-
-    for (const week of weeklyRecords) {
-        const found = week.schools.find(s => s.id === id);
-        if (found) {
-            targetSchool = found;
-            targetWeek = week;
-            break;
-        }
-    }
-
-    if (!targetSchool) return;
-
-    const cell = document.getElementById(`schoolNameCell_${id}`);
-    if (!cell) return;
-
-    cell.innerHTML = `
-        <div class="inline-edit-box">
-            <input type="text" class="inline-edit-input" id="inlineInput_${id}" value="${escapeHtml(targetSchool.schoolName)}" />
-            <button class="btn-inline-save" onclick="window.saveInlineEditSchool('${id}')" title="Save">✓</button>
-            <button class="btn-inline-cancel" onclick="renderWeeklyLedger()" title="Cancel">✕</button>
-        </div>
-    `;
-
-    const input = document.getElementById(`inlineInput_${id}`);
-    if (input) {
-        input.focus();
-        input.select();
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') window.saveInlineEditSchool(id);
-            if (e.key === 'Escape') renderWeeklyLedger();
-        });
-    }
-};
-
-window.saveInlineEditSchool = function(id) {
-    const input = document.getElementById(`inlineInput_${id}`);
-    if (!input) return;
-    const newName = input.value.trim();
-    if (!newName) {
-        showToast('School name cannot be empty.', 'error');
-        return;
-    }
-
-    for (const week of weeklyRecords) {
-        const found = week.schools.find(s => s.id === id);
-        if (found) {
-            found.schoolName = newName;
-            saveWeeklyRecords(weeklyRecords);
-            renderWeeklyLedger();
-            showToast(`Updated school name to "${newName}".`, 'success');
-            return;
-        }
-    }
-};
-
-window.deleteSchoolRecord = function(id) {
-    for (const week of weeklyRecords) {
-        const found = week.schools.find(s => s.id === id);
-        if (found) {
-            if (confirm(`Are you sure you want to delete "${found.schoolName}" (${found.extension}) from this week?`)) {
-                week.schools = week.schools.filter(s => s.id !== id);
-                saveWeeklyRecords(weeklyRecords);
-                renderWeeklyTabs();
-                renderWeeklyLedger();
-                addConsoleLog(`Removed "${found.schoolName}" from week "${week.weekRange}".`, 'info');
-                showToast(`Removed "${found.schoolName}"!`, 'info');
-            }
-            return;
-        }
-    }
-};
-
-window.downloadSchoolCSV = function(id) {
-    for (const week of weeklyRecords) {
-        const found = week.schools.find(s => s.id === id);
-        if (found) {
-            if (!found.csvContent) {
-                showToast('CSV content not available for this entry.', 'error');
-                return;
-            }
-            const blob = new Blob([found.csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const sanitizedName = found.schoolName.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `${sanitizedName}_clean_emails.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-            showToast(`Downloaded clean emails for "${found.schoolName}".`, 'success');
-            return;
-        }
-    }
-};
-
 // ==========================================
-// Next Week Batch Workflow
+// Download & Reset (June 4 Baseline)
 // ==========================================
-nextBatchBtn.addEventListener('click', () => {
-    uploadedFiles = [];
-    renderFileList();
-    updateUploadStats();
 
-    currentBatchSchools = [];
-
-    progressBanner.style.display = 'none';
-    progressBarFill.style.width = '0%';
-    progressPercentText.textContent = '0%';
-
-    if (masterBlobUrl) {
-        URL.revokeObjectURL(masterBlobUrl);
-        masterBlobUrl = null;
-    }
-    nextBatchBtn.disabled = true;
-
-    // Advance week date range input if currently matches this week
-    weekDateRangeInput.value = '';
-    clearWeekRangeBtn.style.display = 'none';
-    weekDateRangeInput.placeholder = 'Enter date range for next week (e.g. 6th Nov - 11th Nov)';
-    weekDateRangeInput.focus();
-
-    addConsoleLog('Upload zone cleared for next week batch. All school records preserved safely in weekly ledger.', 'info');
-    showToast('Ready for next week\'s dump! Ledger records preserved safely.', 'success');
-});
-
-resetBtn.addEventListener('click', () => {
-    if (confirm('Clear uploaded files and reset analysis dashboard? (Weekly records ledger will remain safe).')) {
-        uploadedFiles = [];
-        renderFileList();
-        updateUploadStats();
-
-        currentBatchSchools = [];
-
-        progressBanner.style.display = 'none';
-        
-        statFiles.textContent = '0';
-        statProcessed.textContent = '0';
-        statFiltered.textContent = '0';
-        statClean.textContent = '0';
-        statSchools.textContent = '0';
-
-        if (masterBlobUrl) {
-            URL.revokeObjectURL(masterBlobUrl);
-            masterBlobUrl = null;
-        }
-        nextBatchBtn.disabled = true;
-        showToast('Dashboard reset.', 'info');
-    }
-});
-
-function exportMultiSheetExcel() {
-    const wb = XLSX.utils.book_new();
-    let sheetsAdded = 0;
-
-    for (const week of weeklyRecords) {
-        if (!week.schools || week.schools.length === 0) continue;
-
-        // Clean sheet name: Excel allows max 31 characters and forbids: \ / ? * [ ] :
-        let rawSheetName = (week.weekRange || 'Week')
-            .replace(/[:\\/?*\[\]]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-        
-        if (rawSheetName.length > 31) {
-            rawSheetName = rawSheetName.substring(0, 31).trim();
-        }
-        if (!rawSheetName) {
-            rawSheetName = `Week_${sheetsAdded + 1}`;
-        }
-
-        // Exact requested columns:
-        // Column A: School Name
-        // Column B: Extention
-        // Column C: Unique Count
-        const sheetData = [
-            ['School Name', 'Extention', 'Unique Count']
-        ];
-
-        let weekSum = 0;
-        for (const sch of week.schools) {
-            const count = Number(sch.uniqueCount) || 0;
-            sheetData.push([
-                sch.schoolName || '',
-                sch.extension || '',
-                count
-            ]);
-            weekSum += count;
-        }
-
-        // Summary Total Row
-        sheetData.push([
-            `Total (${week.schools.length} Schools)`,
-            '',
-            weekSum
-        ]);
-
-        const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-        // Set column widths for beautiful layout
-        ws['!cols'] = [
-            { wch: 28 }, // Column A: School Name
-            { wch: 32 }, // Column B: Extention
-            { wch: 18 }  // Column C: Unique Count
-        ];
-
-        XLSX.utils.book_append_sheet(wb, ws, rawSheetName);
-        sheetsAdded++;
-    }
-
-    if (sheetsAdded === 0) {
-        showToast('No school data to export in any weekly tab.', 'error');
-        return;
-    }
-
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `Weekly_School_Records_${dateStr}.xlsx`;
-    XLSX.writeFile(wb, filename);
-
-    addConsoleLog(`Exported Excel workbook "${filename}" with ${sheetsAdded} weekly sheet tabs.`, 'success');
-    showToast(`Downloaded Excel record with ${sheetsAdded} weekly tabs!`, 'success');
-}
-
-function exportFallbackMultiWeekCsv() {
-    let csv = '\uFEFF'; // UTF-8 BOM
-    let totalSchools = 0;
-    let grandTotalSum = 0;
-
-    for (const week of weeklyRecords) {
-        csv += `\n--- WEEK: ${week.weekRange} ---\n`;
-        csv += 'School Name,Extention,Unique Count\n';
-
-        let weekSum = 0;
-        for (const sch of week.schools) {
-            const escapedName = (sch.schoolName.includes(',') || sch.schoolName.includes('"'))
-                ? `"${sch.schoolName.replace(/"/g, '""')}"` : sch.schoolName;
-            const count = Number(sch.uniqueCount) || 0;
-            csv += `${escapedName},${sch.extension || ''},${count}\n`;
-            weekSum += count;
-            totalSchools++;
-        }
-        csv += `Total (${week.schools.length} Schools),,${weekSum}\n`;
-        grandTotalSum += weekSum;
-    }
-
-    csv += `\nGRAND TOTAL (${totalSchools} Schools Across All Weeks),,${grandTotalSum}\n`;
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const dateStr = new Date().toISOString().slice(0, 10);
+// Download Button Event
+downloadBtn.addEventListener('click', () => {
+    if (!processedBlobUrl) return;
+    
+    const timestamp = new Date().toISOString().slice(0, 10);
     const link = document.createElement('a');
-    link.href = url;
-    link.download = `Weekly_School_Records_${dateStr}.csv`;
+    link.href = processedBlobUrl;
+    link.setAttribute('download', `dataflow_clean_emails_${timestamp}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    showToast(`Downloaded records summary CSV!`, 'success');
-}
-
-// Clear active week records
-clearWeekRecordsBtn.addEventListener('click', () => {
-    if (!activeWeekRange) return;
-    const week = weeklyRecords.find(w => w.weekRange.toLowerCase() === activeWeekRange.toLowerCase());
-    if (!week || week.schools.length === 0) return;
-
-    if (confirm(`Clear all ${week.schools.length} school records for week "${week.weekRange}"?`)) {
-        week.schools = [];
-        saveWeeklyRecords(weeklyRecords);
-        renderWeeklyTabs();
-        renderWeeklyLedger();
-        showToast(`Cleared records for "${week.weekRange}".`, 'info');
-    }
+    addConsoleLog('File downloaded successfully.', 'success');
 });
 
-// Clear all weeks
-clearAllRecordsBtn.addEventListener('click', () => {
-    if (weeklyRecords.length === 0) return;
-    if (confirm(`Are you sure you want to clear ALL ${weeklyRecords.length} weekly tabs and all records? This cannot be undone.`)) {
-        weeklyRecords = [];
-        activeWeekRange = null;
-        saveWeeklyRecords(weeklyRecords);
-        renderWeeklyTabs();
-        renderWeeklyLedger();
-        addConsoleLog('All weekly records cleared.', 'info');
-        showToast('All weekly records cleared.', 'info');
+// Reset Button Event
+resetBtn.addEventListener('click', () => {
+    uploadedFiles = [];
+    renderFileList();
+    updateStatsBoard();
+
+    // Terminate worker if working
+    if (worker) {
+        worker.terminate();
+        worker = null;
     }
+
+    // Revoke URL
+    if (processedBlobUrl) {
+        URL.revokeObjectURL(processedBlobUrl);
+        processedBlobUrl = null;
+    }
+
+    // Reset banner and previews
+    progressBanner.style.display = 'none';
+    progressBanner.style.border = '1px solid rgba(99, 102, 241, 0.15)';
+    progressBanner.style.background = 'rgba(99, 102, 241, 0.06)';
+    
+    previewTableBody.innerHTML = '';
+    previewTable.style.display = 'none';
+    previewPlaceholder.style.display = 'block';
+    previewPlaceholder.querySelector('p').textContent = 'No preview available. Process files to view filtered results.';
+    
+    downloadBtn.disabled = true;
+    toggleInputs(false);
+    
+    // Clear dynamic action dropdown
+    actionItemsContainer.innerHTML = '';
+    detectedActions = [];
+    selectAllCheckbox.checked = false;
+    updateSelectedActionsText();
+    processBtn.disabled = true;
+
+    // Log reset
+    consolePanel.innerHTML = '';
+    addConsoleLog('System state reset. Upload multiple CSV logs to start processing.', 'info');
 });
 
-
-
 // ==========================================
-// Dropdown UI Events
+// Dropdown UI Events (June 4 Baseline)
 // ==========================================
+
+// Toggle dropdown visibility
 dropdownTrigger.addEventListener('click', (e) => {
     e.stopPropagation();
     if (dropdownTrigger.classList.contains('disabled')) return;
@@ -1712,6 +589,7 @@ dropdownTrigger.addEventListener('click', (e) => {
     dropdownTrigger.classList.toggle('active', !isVisible);
 });
 
+// Close dropdown when clicking outside
 document.addEventListener('click', (e) => {
     if (!dropdownTrigger.contains(e.target) && !dropdownMenu.contains(e.target)) {
         dropdownMenu.style.display = 'none';
@@ -1719,6 +597,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// Listen to Select All checkbox change
 selectAllCheckbox.addEventListener('change', () => {
     const isChecked = selectAllCheckbox.checked;
     const actionCheckboxes = getActionCheckboxes();
@@ -1727,63 +606,189 @@ selectAllCheckbox.addEventListener('change', () => {
     });
     updateSelectedActionsText();
     
+    // Enable process button if we have files and at least one checkbox is selected
     const hasChecked = actionCheckboxes.some(cb => cb.checked);
     processBtn.disabled = !hasChecked || uploadedFiles.length === 0;
 });
 
-// ==========================================
-// Utility Helpers
-// ==========================================
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
 
-function addConsoleLog(message, type = 'info', timestamp = null) {
-    const time = timestamp || new Date().toLocaleTimeString();
-    const logEl = document.createElement('div');
-    logEl.className = `console-log ${type}`;
-    logEl.innerHTML = `<span class="timestamp">[${time}]</span>${message}`;
-    consolePanel.appendChild(logEl);
-    consolePanel.scrollTop = consolePanel.scrollHeight;
-}
+/* =========================================================================
+   NEW LEVEL UPGRADE CODE (COMMENTED OUT - PRESERVED FOR FUTURE USE)
+   Do NOT remove. Keep commented out for future reactivation if needed.
+   =========================================================================
 
-function showToast(message, type = 'info') {
-    if (!toastContainer) return;
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    
-    let iconSvg = '';
-    if (type === 'success') {
-        iconSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-    } else if (type === 'error') {
-        iconSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`;
-    } else {
-        iconSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
-    }
-    
-    toast.innerHTML = `
-        <span class="toast-icon">${iconSvg}</span>
-        <span class="toast-message">${message}</span>
-    `;
-    
-    toastContainer.appendChild(toast);
-    setTimeout(() => {
-        if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-        }
-    }, 4000);
-}
+// --- State Variables for Weekly Multi-School & Ledger ---
+// let currentBatchSchools = [];
+// let loadedOrgExtensions = null;
+// const WEEKLY_STORAGE_KEY = 'dataflow_weekly_school_records_v1';
+// const LEGACY_STORAGE_KEY = 'dataflow_school_records_v1';
+// let weeklyRecords = [];
+// let activeWeekRange = null;
 
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
+// --- Calendar Picker Elements & State ---
+// const weekDateRangeInput = document.getElementById('weekDateRangeInput');
+// const clearWeekRangeBtn = document.getElementById('clearWeekRangeBtn');
+// const btnPresetThisWeek = document.getElementById('btnPresetThisWeek');
+// const btnPresetLastWeek = document.getElementById('btnPresetLastWeek');
+// const calendarToggleBtn = document.getElementById('calendarToggleBtn');
+// const calendarDropdown = document.getElementById('calendarDropdown');
+// const calMonthTitle = document.getElementById('calMonthTitle');
+// const calPrevMonth = document.getElementById('calPrevMonth');
+// const calNextMonth = document.getElementById('calNextMonth');
+// const calDaysGrid = document.getElementById('calDaysGrid');
+// const calModeWeek = document.getElementById('calModeWeek');
+// const calModeCustom = document.getElementById('calModeCustom');
+// const calPresetThisWeek = document.getElementById('calPresetThisWeek');
+// const calPresetLastWeek = document.getElementById('calPresetLastWeek');
+// const calCloseBtn = document.getElementById('calCloseBtn');
+// let calCurrentDate = new Date();
+// let calMode = 'week';
+// let calCustomStart = null;
+// let calCustomEnd = null;
+
+// --- Unified Download & Ledger Elements ---
+// const unifiedDownloadBtn = document.getElementById('unifiedDownloadBtn');
+// const unifiedDownloadMenu = document.getElementById('unifiedDownloadMenu');
+// const btnDownloadCombined = document.getElementById('btnDownloadCombined');
+// const btnDownloadSeparate = document.getElementById('btnDownloadSeparate');
+// const btnDownloadExcel = document.getElementById('btnDownloadExcel');
+// const nextBatchBtn = document.getElementById('nextBatchBtn');
+// const statSchools = document.getElementById('statSchools');
+// const ledgerCard = document.getElementById('ledgerCard');
+// const weekTabsBar = document.getElementById('weekTabsBar');
+// const ledgerActiveWeekDisplay = document.getElementById('ledgerActiveWeekDisplay');
+// const ledgerSchoolsCount = document.getElementById('ledgerSchoolsCount');
+// const ledgerTotalCount = document.getElementById('ledgerTotalCount');
+// const ledgerTable = document.getElementById('ledgerTable');
+// const ledgerTableBody = document.getElementById('ledgerTableBody');
+// const ledgerPlaceholder = document.getElementById('ledgerPlaceholder');
+// const clearWeekRecordsBtn = document.getElementById('clearWeekRecordsBtn');
+// const clearAllRecordsBtn = document.getElementById('clearAllRecordsBtn');
+
+// --- Storage & Migration Helpers ---
+// function loadWeeklyRecords() {
+//     try {
+//         const raw = localStorage.getItem(WEEKLY_STORAGE_KEY);
+//         if (raw) {
+//             const parsed = JSON.parse(raw);
+//             if (Array.isArray(parsed)) return parsed;
+//         }
+//     } catch (e) {
+//         console.error('Failed to load weekly records from storage', e);
+//     }
+//     return [];
+// }
+// function saveWeeklyRecords(data) {
+//     try {
+//         localStorage.setItem(WEEKLY_STORAGE_KEY, JSON.stringify(data));
+//     } catch (e) {
+//         console.error('Failed to save weekly records to storage', e);
+//     }
+// }
+// function getInitialActiveWeek() {
+//     if (weeklyRecords && weeklyRecords.length > 0) return weeklyRecords[0].weekRange;
+//     return getWeekDateRangeString(0);
+// }
+
+// --- Date Formatting (Saturday to Friday Cycle) ---
+// function getOrdinalSuffix(day) {
+//     if (day > 3 && day < 21) return 'th';
+//     switch (day % 10) {
+//         case 1:  return 'st';
+//         case 2:  return 'nd';
+//         case 3:  return 'rd';
+//         default: return 'th';
+//     }
+// }
+// function formatOrdinalDate(date) {
+//     const day = date.getDate();
+//     const suffix = getOrdinalSuffix(day);
+//     const month = date.toLocaleDateString('en-US', { month: 'short' });
+//     return `${day}${suffix} ${month}`;
+// }
+// function getWeekDateRangeString(offsetWeeks = 0) {
+//     const now = new Date();
+//     const currentDay = now.getDay();
+//     const diffToSaturday = -((currentDay + 1) % 7);
+//     const saturday = new Date(now);
+//     saturday.setDate(now.getDate() + diffToSaturday + (offsetWeeks * 7));
+//     const friday = new Date(saturday);
+//     friday.setDate(saturday.getDate() + 6);
+//     return `${formatOrdinalDate(saturday)} - ${formatOrdinalDate(friday)}`;
+// }
+
+// --- Calendar Picker Logic ---
+// function isSameDate(d1, d2) {
+//     if (!d1 || !d2) return false;
+//     return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+// }
+// function setWeekDateRange(val) {
+//     if (!weekDateRangeInput) return;
+//     weekDateRangeInput.value = val;
+//     if (clearWeekRangeBtn) clearWeekRangeBtn.style.display = 'block';
+//     weekDateRangeInput.dispatchEvent(new Event('input', { bubbles: true }));
+// }
+// function selectWeekFromDate(date) {
+//     const target = new Date(date);
+//     const day = target.getDay();
+//     const diffToSaturday = -((day + 1) % 7);
+//     const saturday = new Date(target);
+//     saturday.setDate(target.getDate() + diffToSaturday);
+//     const friday = new Date(saturday);
+//     friday.setDate(saturday.getDate() + 6);
+//     const formattedRange = `${formatOrdinalDate(saturday)} - ${formatOrdinalDate(friday)}`;
+//     setWeekDateRange(formattedRange);
+//     renderCalendarGrid();
+//     setTimeout(closeCalendar, 200);
+// }
+// function renderCalendarGrid() { ... }
+// function openCalendar() { ... }
+// function closeCalendar() { ... }
+
+// --- Official School Org Extensions Engine ---
+// function extractExtensionsFromWorkbook(workbook) {
+//     if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) return null;
+//     const sheetName = workbook.SheetNames.includes('Extensions') ? 'Extensions' : workbook.SheetNames[0];
+//     const sheet = workbook.Sheets[sheetName];
+//     if (!sheet) return null;
+//     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+//     if (!rows || rows.length === 0) return null;
+//     const map = {};
+//     let orgCol = -1, extCol = -1;
+//     for (let r = 0; r < rows.length; r++) {
+//         const row = rows[r];
+//         if (!Array.isArray(row)) continue;
+//         for (let c = 0; c < row.length; c++) {
+//             const val = String(row[c] || '').trim().toLowerCase();
+//             if (val === 'org' || val === 'school') orgCol = c;
+//             if (val === 'email extension' || val === 'extension') extCol = c;
+//         }
+//         if (orgCol !== -1 && extCol !== -1 && r > 0) {
+//             const org = String(row[orgCol] || '').trim();
+//             let ext = String(row[extCol] || '').trim().toLowerCase();
+//             if (ext.startsWith('@')) ext = ext.slice(1);
+//             if (org && ext && ext.includes('.') && !ext.includes('email extension')) map[ext] = org;
+//         }
+//     }
+//     return Object.keys(map).length > 0 ? map : null;
+// }
+// async function loadDefaultOrgExtensionsFromExcel() {
+//     try {
+//         const response = await fetch('Org_Email_Extensions_Complete.xlsx');
+//         if (!response.ok) return;
+//         const arrayBuffer = await response.arrayBuffer();
+//         if (typeof XLSX !== 'undefined') {
+//             const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+//             const extMap = extractExtensionsFromWorkbook(workbook);
+//             if (extMap) loadedOrgExtensions = extMap;
+//         }
+//     } catch (e) {}
+// }
+
+// --- Multi-School Batch Ledger & SheetJS Export ---
+// function saveBatchSchoolsToWeek(weekRange, batchSchools) { ... }
+// function renderWeeklyTabs() { ... }
+// function renderWeeklyLedger() { ... }
+// function exportMultiSheetExcel() { ... }
+// function exportFallbackMultiWeekCsv() { ... }
+========================================================================= */
